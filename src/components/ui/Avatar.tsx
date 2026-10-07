@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text, Image } from 'react-native';
 
 export interface AvatarProps {
   name: string;
@@ -42,21 +43,20 @@ export const Avatar: React.FC<AvatarProps> = ({
       : 'bg-[#2D6A4F] text-[#E6F2E8]';
 
   return (
-    <div
-      className={`relative inline-flex items-center justify-center rounded-full shrink-0 select-none overflow-hidden ${sizeClasses} ${
+    <View
+      className={`relative inline-flex items-center justify-center rounded-full shrink-0 overflow-hidden ${sizeClasses} ${
         imageUrl ? 'bg-slate-100' : roleBg
       } ${className}`}
     >
       {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={name}
-          className="w-full h-full object-cover"
-          referrerPolicy="no-referrer"
+        <Image
+          source={{ uri: imageUrl }}
+          className="w-full h-full"
+          resizeMode="cover"
         />
       ) : (
-        <span>{initials}</span>
+        <Text className="text-white font-bold">{initials}</Text>
       )}
-    </div>
+    </View>
   );
 };

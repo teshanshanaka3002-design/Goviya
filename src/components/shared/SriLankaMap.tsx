@@ -1,6 +1,7 @@
 import React from 'react';
-import { MapPin, Navigation, Compass, Layers } from 'lucide-react';
-import { Listing } from '../../types';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Svg, { Rect, Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { MapPin, Navigation, Compass, Layers } from 'lucide-react-native';
 
 export interface SriLankaMapProps {
   markers?: {
@@ -28,10 +29,7 @@ export const SriLankaMap: React.FC<SriLankaMapProps> = ({
   routeTitle,
   className = '',
 }) => {
-  // Center roughly on central Sri Lanka: Lat 7.8, Lng 80.7
-  // Bounding box: Lat 5.9 to 9.8 (height ~3.9), Lng 79.5 to 81.9 (width ~2.4)
   const projectCoordinates = (lat: number, lng: number) => {
-    // Map to SVG coordinates 0-100%
     const minLat = 5.8;
     const maxLat = 9.9;
     const minLng = 79.5;
@@ -39,89 +37,69 @@ export const SriLankaMap: React.FC<SriLankaMapProps> = ({
 
     const x = ((lng - minLng) / (maxLng - minLng)) * 100;
     const y = 100 - ((lat - minLat) / (maxLat - minLat)) * 100;
-    return { x: Math.max(8, Math.min(92, x)), y: Math.max(8, Math.min(92, y)) };
+    return { x: Math.max(10, Math.min(90, x)), y: Math.max(10, Math.min(90, y)) };
   };
 
   return (
-    <div
-      className={`relative w-full h-64 bg-[#EAF4ED] rounded-2xl overflow-hidden border border-[#D5EAD8] shadow-inner ${className}`}
-    >
-      {/* Background Topographic Water & Island Geometry */}
-      <svg
-        viewBox="0 0 100 100"
-        className="absolute inset-0 w-full h-full object-cover"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient id="islandLandGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#DFEFE3" />
-            <stop offset="50%" stopColor="#D5EAD8" />
-            <stop offset="100%" stopColor="#CBE4CE" />
-          </linearGradient>
-          <pattern id="gridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
-            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#D1E8D5" strokeWidth="0.5" />
-          </pattern>
-        </defs>
+    <View style={styles.mapContainer}>
+      <Svg viewBox="0 0 100 100" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <LinearGradient id="islandLandGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0%" stopColor="#DFEFE3" />
+            <Stop offset="100%" stopColor="#D5EAD8" />
+          </LinearGradient>
+        </Defs>
 
-        <rect width="100" height="100" fill="#EAF4ED" />
-        <rect width="100" height="100" fill="url(#gridPattern)" />
+        <Rect width="100" height="100" fill="#EAF4ED" />
 
         {/* Approximate Stylized Sri Lanka Teardrop Island Silhouette */}
-        <path
-          d="M 38 12 
-             C 45 8, 52 14, 54 22 
-             C 58 32, 68 45, 72 58 
-             C 74 70, 70 82, 58 92 
-             C 48 94, 38 90, 32 82 
-             C 24 72, 22 55, 25 40 
-             C 28 28, 30 18, 38 12 Z"
-          fill="url(#islandLandGrad)"
+        <Path
+          d="M 38 12 C 45 8, 52 14, 54 22 C 58 32, 68 45, 72 58 C 74 70, 70 82, 58 92 C 48 94, 38 90, 32 82 C 24 72, 22 55, 25 40 C 28 28, 30 18, 38 12 Z"
+          fill="#D5EAD8"
           stroke="#B8DEC0"
           strokeWidth="0.8"
         />
 
-        {/* Major Transport Corridors (A1, A7, A9) */}
-        <path
+        {/* Major Transport Corridors */}
+        <Path
           d="M 30 70 Q 42 55 50 45 T 46 20"
           fill="none"
           stroke="#FFFFFF"
           strokeWidth="1.2"
           strokeDasharray="2,1"
-          opacity="0.8"
+          opacity={0.8}
         />
-        <path
+        <Path
           d="M 30 70 Q 40 72 50 62"
           fill="none"
           stroke="#FFFFFF"
           strokeWidth="1.2"
-          opacity="0.8"
+          opacity={0.8}
         />
 
-        {/* Dynamic Route Line if requested */}
         {showRoute && (
-          <path
+          <Path
             d="M 52 64 C 48 66, 38 68, 30 70"
             fill="none"
             stroke="#1F5C3A"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeDasharray="4,2"
-            className="animate-pulse"
           />
         )}
-      </svg>
+      </Svg>
 
       {/* Compass Badge */}
-      <div className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-xs px-2 py-1 rounded-xl shadow-xs flex items-center gap-1.5 text-[10px] font-bold text-[#1F5C3A]">
-        <Compass className="w-3.5 h-3.5" />
-        <span>Sri Lanka Agri GPS</span>
-      </div>
+      <View style={styles.compassBadge}>
+        <Compass size={14} color="#1F5C3A" />
+        <Text style={styles.compassText}>Sri Lanka Agri GPS</Text>
+      </View>
 
       {routeTitle && (
-        <div className="absolute top-2.5 left-2.5 bg-[#1F5C3A] text-white px-2.5 py-1 rounded-xl shadow-xs text-[10px] font-semibold flex items-center gap-1">
-          <Navigation className="w-3 h-3" />
-          <span>{routeTitle}</span>
-        </div>
+        <View style={styles.routeBadge}>
+          <Navigation size={12} color="#ffffff" />
+          <Text style={styles.routeText}>{routeTitle}</Text>
+        </View>
       )}
 
       {/* Markers */}
@@ -130,55 +108,171 @@ export const SriLankaMap: React.FC<SriLankaMapProps> = ({
         const isSelected = selectedId === m.id;
 
         return (
-          <button
+          <Pressable
             key={`${m.id}-${idx}`}
-            type="button"
-            onClick={() => onSelectMarker?.(m.id)}
-            style={{ left: `${x}%`, top: `${y}%` }}
-            className={`absolute -translate-x-1/2 -translate-y-1/2 transition-transform duration-200 cursor-pointer ${
-              isSelected ? 'scale-125 z-20' : 'hover:scale-110 z-10'
-            }`}
-            title={`${m.name} (${m.town})`}
+            onPress={() => onSelectMarker?.(m.id)}
+            style={[
+              styles.markerWrapper,
+              { left: `${x}%`, top: `${y}%` },
+            ]}
           >
-            <div className="relative flex flex-col items-center">
-              {/* Pin Icon */}
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center shadow-md border-2 border-white transition-colors ${
-                  m.type === 'driver'
-                    ? 'bg-[#5BB5C9] text-white'
-                    : m.type === 'buyer'
-                    ? 'bg-[#C8452D] text-white'
-                    : isSelected
-                    ? 'bg-[#1F5C3A] text-white ring-2 ring-[#1F5C3A]/40'
-                    : 'bg-[#1F5C3A] text-white'
-                }`}
-              >
-                <MapPin className="w-3.5 h-3.5" />
-              </div>
+            <View
+              style={[
+                styles.markerPin,
+                m.type === 'driver'
+                  ? { backgroundColor: '#5BB5C9' }
+                  : m.type === 'buyer'
+                  ? { backgroundColor: '#C8452D' }
+                  : { backgroundColor: '#1F5C3A' },
+              ]}
+            >
+              <MapPin size={13} color="#ffffff" />
+            </View>
 
-              {/* Tag Label */}
-              <div
-                className={`mt-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-xs whitespace-nowrap pointer-events-none ${
-                  isSelected
-                    ? 'bg-[#1F5C3A] text-white'
-                    : 'bg-white/95 text-[#1A1A1A] border border-black/10'
-                }`}
+            <View
+              style={[
+                styles.markerLabel,
+                isSelected && styles.markerLabelSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.markerLabelText,
+                  isSelected && { color: '#ffffff' },
+                ]}
+                numberOfLines={1}
               >
                 {m.town}
-              </div>
-            </div>
-          </button>
+              </Text>
+            </View>
+          </Pressable>
         );
       })}
 
       {/* Bottom Map Controls hint */}
-      <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[10px] text-[#2D6A4F] bg-white/80 backdrop-blur-xs px-2.5 py-1 rounded-lg">
-        <span className="font-semibold flex items-center gap-1">
-          <Layers className="w-3 h-3" />
-          Direct Farm Gate Hubs
-        </span>
-        <span>Tap any marker to explore</span>
-      </div>
-    </div>
+      <View style={styles.bottomHintBar}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Layers size={12} color="#1F5C3A" />
+          <Text style={styles.hintText}>
+            Direct Farm Gate Hubs
+          </Text>
+        </View>
+        <Text style={styles.hintAction}>Tap marker to explore</Text>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  mapContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 250,
+    backgroundColor: '#EAF4ED',
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D5EAD8',
+  },
+  compassBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  compassText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1F5C3A',
+  },
+  routeBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: '#1F5C3A',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  routeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  markerWrapper: {
+    position: 'absolute',
+    alignItems: 'center',
+    transform: [{ translateX: -14 }, { translateY: -14 }],
+  },
+  markerPin: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  markerLabel: {
+    marginTop: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  markerLabelSelected: {
+    backgroundColor: '#1F5C3A',
+  },
+  markerLabelText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  bottomHintBar: {
+    position: 'absolute',
+    bottom: 8,
+    left: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  hintText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1F5C3A',
+  },
+  hintAction: {
+    fontSize: 10,
+    color: '#1F5C3A',
+    fontWeight: '500',
+  },
+});

@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text } from 'react-native';
 import { OrderStatus } from '../../types';
 
 export interface StatusPillProps {
@@ -15,6 +16,7 @@ export interface StatusPillProps {
     | 'cancelled'
     | 'active'
     | 'out_of_stock'
+    | 'removed'
     | 'resolved'
     | 'dismissed';
   label?: string;
@@ -74,19 +76,20 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
   }
 
   return (
-    <span
+    <View
       style={{
         backgroundColor: bgColor,
-        color: textColor,
         borderColor: borderColor,
       }}
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border tracking-tight ${className}`}
+      className={`flex-row items-center gap-1.5 px-2.5 py-1 rounded-full border self-start ${className}`}
     >
-      <span
+      <View
         style={{ backgroundColor: dotColor }}
-        className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse"
+        className="w-1.5 h-1.5 rounded-full shrink-0"
       />
-      <span className="whitespace-nowrap">{displayLabel}</span>
-    </span>
+      <Text style={{ color: textColor }} className="text-xs font-semibold">
+        {displayLabel}
+      </Text>
+    </View>
   );
 };

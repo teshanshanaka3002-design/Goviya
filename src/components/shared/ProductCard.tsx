@@ -1,5 +1,6 @@
 import React from 'react';
-import { MapPin, Star, Plus, Check } from 'lucide-react';
+import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
+import { MapPin, Star, Plus, Check, MessageSquare } from 'lucide-react-native';
 import { Listing } from '../../types';
 import { ProduceVisual } from '../ui/ProduceVisual';
 import { Card } from '../ui/Card';
@@ -17,19 +18,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onSelect,
   compact = false,
 }) => {
-  const { addToCart, cart, goToSubScreen } = useApp();
+  const { addToCart, goToSubScreen } = useApp();
   const [justAdded, setJustAdded] = React.useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = React.useState(false);
 
-  const isInCart = cart.some(item => item.listing._id === listing._id);
-
-  const handleOpenSeller = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleOpenSeller = () => {
     setIsSellerModalOpen(true);
   };
 
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleAddToCart = () => {
     addToCart(listing, listing.minOrderKg || 5);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
@@ -43,158 +40,422 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
+  const hasPhoto =
+    listing.photos &&
+    listing.photos.length > 0 &&
+    (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http'));
+
   if (compact) {
-    const hasPhoto = listing.photos && listing.photos.length > 0 && (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http'));
     return (
-      <Card
-        variant="interactive"
-        padding="sm"
-        onClick={handleClick}
-        className="flex items-center gap-3 w-full"
-      >
-        {hasPhoto ? (
-          <img
-            src={listing.photos[0]}
-            alt={listing.cropName}
-            className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[#E5E5E5]"
-          />
-        ) : (
-          <ProduceVisual type={listing.cropName} size="sm" className="shrink-0" />
-        )}
-        <div className="flex-1 min-w-0 text-left">
-          <h4 className="text-sm font-bold text-[#1A1A1A] truncate">{listing.cropName}</h4>
-          <button
-            type="button"
-            onClick={handleOpenSeller}
-            className="text-xs text-[#4B6B56] hover:text-[#1F5C3A] hover:underline font-medium truncate block text-left cursor-pointer"
-            title="View Seller Profile & Chat"
-          >
-            {listing.farmerName} · {listing.location.town}
-          </button>
-          <div className="flex items-baseline gap-1 mt-0.5">
-            <span className="text-xs font-extrabold text-[#1F5C3A]">
-              LKR {listing.pricePerKg.toLocaleString()}
-            </span>
-            <span className="text-[10px] text-[#9CA3AF]">/ kg</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={handleAddToCart}
-          className="p-2 rounded-xl bg-[#E6F2E8] text-[#1F5C3A] hover:bg-[#1F5C3A] hover:text-white transition-colors cursor-pointer shrink-0"
+      <View style={{ width: '100%' }}>
+        <Card
+          variant="interactive"
+          padding="sm"
+          onPress={handleClick}
+          style={ps.compactCard}
         >
-          {justAdded ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-        </button>
-      </Card>
+          {hasPhoto ? (
+            <Image
+              source={{ uri: listing.photos[0] }}
+              style={ps.compactPhoto}
+              resizeMode="cover"
+            />
+          ) : (
+            <ProduceVisual type={listing.cropName} size="sm" />
+          )}
+
+          <View style={ps.compactBody}>
+            <Text style={ps.cropTitleCompact} numberOfLines={1}>
+              {listing.cropName}
+            </Text>
+            <Pressable onPress={handleOpenSeller}>
+              <Text style={ps.compactSubtitle} numberOfLines={1}>
+                {listing.farmerName} · {listing.location.town}
+              </Text>
+            </Pressable>
+            <View style={ps.compactPriceRow}>
+              <Text style={ps.priceTextSmall}>
+                {`LKR ${listing.pricePerKg.toLocaleString()}`}
+              </Text>
+              <Text style={ps.unitText}>/kg</Text>
+              <Text style={ps.minOrderDot}>·</Text>
+              <Text style={ps.minOrderText}>{`Min ${listing.minOrderKg}kg`}</Text>
+            </View>
+          </View>
+
+          <Pressable
+            onPress={handleAddToCart}
+            style={[
+              ps.compactAddBtn,
+              justAdded && { backgroundColor: '#1F5C3A' },
+            ]}
+          >
+            {justAdded ? (
+              <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
+            ) : (
+              <Plus size={16} color="#1F5C3A" strokeWidth={2.5} />
+            )}
+          </Pressable>
+        </Card>
+
+        <SellerProfileModal
+          farmerId={listing.farmerId}
+          isOpen={isSellerModalOpen}
+          onClose={() => setIsSellerModalOpen(false)}
+          initialCropName={listing.cropName}
+        />
+      </View>
     );
   }
 
   return (
-    <Card
-      variant="interactive"
-      padding="none"
-      onClick={handleClick}
-      className="flex flex-col h-full group"
-    >
-      {/* Top Media Area */}
-      <div className="relative w-full h-36 bg-[#F6F7F5] overflow-hidden flex items-center justify-center">
-        {listing.photos && listing.photos.length > 0 && (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http')) ? (
-          <img
-            src={listing.photos[0]}
-            alt={listing.cropName}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="p-3">
-            <ProduceVisual
-              type={listing.cropName}
-              size="lg"
-              className="transition-transform duration-300 group-hover:scale-105"
+    <View style={{ width: '100%', height: '100%' }}>
+      <Card
+        variant="interactive"
+        padding="none"
+        onPress={handleClick}
+        style={ps.fullCard}
+      >
+        {/* Top Media Area */}
+        <View style={ps.mediaArea}>
+          {hasPhoto ? (
+            <Image
+              source={{ uri: listing.photos[0] }}
+              style={ps.cardImage}
+              resizeMode="cover"
             />
-          </div>
-        )}
+          ) : (
+            <ProduceVisual type={listing.cropName} size="md" />
+          )}
 
-        {listing.isOrganic && (
-          <span className="absolute top-2.5 left-2.5 bg-[#1F5C3A] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs">
-            Organic
-          </span>
-        )}
+          {listing.isOrganic && (
+            <View style={ps.organicBadge}>
+              <Text style={ps.organicBadgeText}>Organic</Text>
+            </View>
+          )}
 
-        <div className="absolute top-2.5 right-2.5 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded-full flex items-center gap-1 text-[11px] font-bold text-[#1A1A1A] shadow-xs">
-          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-          <span>{listing.farmerRating.toFixed(1)}</span>
-        </div>
-      </div>
+          <View style={ps.ratingBadge}>
+            <Star size={10} color="#F59E0B" fill="#F59E0B" />
+            <Text style={ps.ratingBadgeText}>
+              {listing.farmerRating.toFixed(1)}
+            </Text>
+          </View>
+        </View>
 
-      {/* Body Content */}
-      <div className="p-3.5 flex flex-col flex-1 text-left">
-        <div className="flex items-center gap-1.5 text-[11px] text-[#6B7280] mb-1">
-          <MapPin className="w-3 h-3 text-[#1F5C3A]" />
-          <span className="truncate">
-            {listing.location.town}, {listing.location.district}
-          </span>
-        </div>
+        {/* Card Body */}
+        <View style={ps.body}>
+          {/* Location */}
+          <View style={ps.locationRow}>
+            <MapPin size={11} color="#1F5C3A" />
+            <Text style={ps.locationText} numberOfLines={1}>
+              {listing.location.town}, {listing.location.district}
+            </Text>
+          </View>
 
-        <h3 className="text-sm font-bold text-[#1A1A1A] line-clamp-1 mb-1 group-hover:text-[#1F5C3A] transition-colors">
-          {listing.cropName}
-        </h3>
+          {/* Crop Name */}
+          <Text style={ps.cropTitle} numberOfLines={1}>
+            {listing.cropName}
+          </Text>
 
-        <button
-          type="button"
-          onClick={handleOpenSeller}
-          className="text-[11px] text-[#4B6B56] hover:text-[#1F5C3A] hover:underline font-semibold line-clamp-1 mb-2 text-left flex items-center gap-1 cursor-pointer"
-          title="View Seller Profile & Chat"
-        >
-          <span>Farmer: {listing.farmerName}</span>
-          <span className="text-[10px] text-[#1F5C3A] bg-[#E6F2E8] px-1.5 py-0.2 rounded-md font-bold">
-            Chat 💬
-          </span>
-        </button>
+          {/* Farmer & Chat Row */}
+          <Pressable onPress={handleOpenSeller} style={ps.farmerRow}>
+            <Text style={ps.farmerName} numberOfLines={1}>
+              {listing.farmerName}
+            </Text>
+            <View style={ps.chatPill}>
+              <MessageSquare size={10} color="#1F5C3A" />
+              <Text style={ps.chatPillText}>Chat</Text>
+            </View>
+          </Pressable>
 
-        {/* Pricing & Order CTA */}
-        <div className="mt-auto pt-2 border-t border-[#F0F0EE] flex items-center justify-between">
-          <div>
-            <div className="text-[10px] text-[#9CA3AF] uppercase font-semibold">Price</div>
-            <div className="flex items-baseline gap-0.5">
-              <span className="text-sm font-extrabold text-[#1F5C3A]">
-                LKR {listing.pricePerKg.toLocaleString()}
-              </span>
-              <span className="text-[10px] text-[#6B7280]">/kg</span>
-            </div>
-          </div>
+          {/* Pricing & Add to Cart Action */}
+          <View style={ps.priceRow}>
+            <View style={ps.priceInfo}>
+              <View style={ps.priceAmountRow}>
+                <Text style={ps.priceValue} numberOfLines={1}>
+                  {`LKR ${listing.pricePerKg.toLocaleString()}`}
+                </Text>
+                <Text style={ps.priceUnit}>/kg</Text>
+              </View>
+              <Text style={ps.minOrderSubtitle}>
+                {`Min ${listing.minOrderKg} kg`}
+              </Text>
+            </View>
 
-          <button
-            type="button"
-            onClick={handleAddToCart}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              justAdded
-                ? 'bg-[#1F5C3A] text-white'
-                : 'bg-[#E6F2E8] text-[#1F5C3A] hover:bg-[#1F5C3A] hover:text-white active:scale-95'
-            }`}
-            aria-label={`Add ${listing.cropName} to cart`}
-          >
-            {justAdded ? (
-              <>
-                <Check className="w-3.5 h-3.5" />
-                <span>Added</span>
-              </>
-            ) : (
-              <>
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add ({listing.minOrderKg}kg)</span>
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+            <Pressable
+              onPress={handleAddToCart}
+              style={[
+                ps.addBtn,
+                justAdded
+                  ? { backgroundColor: '#1F5C3A', borderColor: '#1F5C3A' }
+                  : { backgroundColor: '#E6F2E8', borderColor: '#CDE5D2' },
+              ]}
+            >
+              {justAdded ? (
+                <View style={ps.btnContent}>
+                  <Check size={13} color="#FFFFFF" strokeWidth={2.5} />
+                  <Text style={ps.addedBtnText}>Added</Text>
+                </View>
+              ) : (
+                <View style={ps.btnContent}>
+                  <Plus size={13} color="#1F5C3A" strokeWidth={2.5} />
+                  <Text style={ps.addBtnText}>Add</Text>
+                </View>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </Card>
 
-      {/* Seller Profile & Chat Modal */}
       <SellerProfileModal
         farmerId={listing.farmerId}
         isOpen={isSellerModalOpen}
         onClose={() => setIsSellerModalOpen(false)}
         initialCropName={listing.cropName}
       />
-    </Card>
+    </View>
   );
 };
+
+const ps = StyleSheet.create({
+  fullCard: {
+    flexDirection: 'column',
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  mediaArea: {
+    position: 'relative',
+    width: '100%',
+    height: 120,
+    backgroundColor: '#F8FAF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  organicBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#1F5C3A',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    zIndex: 2,
+  },
+  organicBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  ratingBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    zIndex: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  ratingBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1A1A1A',
+  },
+  body: {
+    padding: 10,
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 2,
+  },
+  locationText: {
+    fontSize: 10,
+    color: '#6B7280',
+    flex: 1,
+    fontWeight: '500',
+  },
+  cropTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  farmerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+    marginBottom: 8,
+  },
+  farmerName: {
+    fontSize: 10.5,
+    color: '#4B6B56',
+    fontWeight: '600',
+    flex: 1,
+  },
+  chatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#E6F2E8',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    flexShrink: 0,
+  },
+  chatPillText: {
+    fontSize: 9.5,
+    color: '#1F5C3A',
+    fontWeight: '700',
+  },
+  priceRow: {
+    marginTop: 2,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F2F4F2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  priceInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  priceAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 1.5,
+  },
+  priceValue: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#1F5C3A',
+  },
+  priceUnit: {
+    fontSize: 9.5,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  minOrderSubtitle: {
+    fontSize: 9.5,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  addBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2.5,
+  },
+  addBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1F5C3A',
+  },
+  addedBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // Compact layout styles
+  compactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    padding: 10,
+  },
+  compactPhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    flexShrink: 0,
+    backgroundColor: '#F3F4F6',
+  },
+  compactBody: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  cropTitleCompact: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1A1A1A',
+  },
+  compactSubtitle: {
+    fontSize: 11,
+    color: '#4B6B56',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  compactPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 3,
+    marginTop: 2,
+  },
+  priceTextSmall: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#1F5C3A',
+  },
+  unitText: {
+    fontSize: 9.5,
+    color: '#9CA3AF',
+  },
+  minOrderDot: {
+    fontSize: 9.5,
+    color: '#D1D5DB',
+  },
+  minOrderText: {
+    fontSize: 9.5,
+    color: '#9CA3AF',
+  },
+  compactAddBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: '#E6F2E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+});

@@ -1,12 +1,18 @@
 import React from 'react';
+import { Pressable, Text, View, ActivityIndicator } from 'react-native';
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps {
   variant?: 'primary' | 'outline' | 'destructive' | 'ghost' | 'secondary';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   isLoading?: boolean;
+  children?: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
+  onPress?: () => void;
+  style?: any;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -19,45 +25,60 @@ export const Button: React.FC<ButtonProps> = ({
   isLoading = false,
   className = '',
   disabled,
+  onPress,
   ...props
 }) => {
   const baseClasses =
-    'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 select-none cursor-pointer';
+    'flex-row items-center justify-center font-medium rounded-xl';
 
   const sizeClasses = {
-    sm: 'text-xs px-3 py-1.5 h-8 gap-1.5',
-    md: 'text-sm px-4 py-2.5 h-11 min-h-[44px] gap-2',
-    lg: 'text-base px-6 py-3 h-13 min-h-[48px] gap-2.5 font-semibold',
+    sm: 'px-3 py-1.5 h-8 gap-1.5',
+    md: 'px-4 py-2.5 h-11 min-h-[44px] gap-2',
+    lg: 'px-6 py-3 h-12 min-h-[48px] gap-2.5',
+  }[size];
+
+  const textClasses = {
+    sm: 'text-xs',
+    md: 'text-sm font-medium',
+    lg: 'text-base font-semibold',
   }[size];
 
   const variantClasses = {
-    primary:
-      'bg-[#1F5C3A] text-white hover:bg-[#16452B] active:bg-[#123622] shadow-sm',
-    outline:
-      'border border-[#E5E5E5] text-[#1A1A1A] bg-white hover:bg-[#F6F7F5] active:bg-[#ECEEEA]',
-    destructive:
-      'bg-[#C8452D] text-white hover:bg-[#AF3A23] active:bg-[#962F1B] shadow-sm',
-    ghost:
-      'text-[#6B7280] hover:text-[#1A1A1A] hover:bg-[#F0F2EE] active:bg-[#E5E8E2]',
-    secondary:
-      'bg-[#E6F2E8] text-[#1F5C3A] hover:bg-[#D5EAD8] active:bg-[#C2DFCA] font-semibold',
+    primary: 'bg-[#1F5C3A] text-white',
+    outline: 'border border-[#E5E5E5] text-[#1A1A1A] bg-white',
+    destructive: 'bg-[#C8452D] text-white',
+    ghost: 'text-[#6B7280]',
+    secondary: 'bg-[#E6F2E8] text-[#1F5C3A]',
+  }[variant];
+
+  const textColorClass = {
+    primary: 'text-white',
+    outline: 'text-[#1A1A1A]',
+    destructive: 'text-white',
+    ghost: 'text-[#6B7280]',
+    secondary: 'text-[#1F5C3A]',
   }[variant];
 
   return (
-    <button
+    <Pressable
+      onPress={disabled || isLoading ? undefined : onPress}
+      disabled={disabled || isLoading}
       className={`${baseClasses} ${sizeClasses} ${variantClasses} ${
         fullWidth ? 'w-full' : ''
-      } ${className}`}
-      disabled={disabled || isLoading}
+      } ${disabled || isLoading ? 'opacity-50' : ''} ${className}`}
       {...props}
     >
       {isLoading ? (
-        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-1.5" />
+        <ActivityIndicator size="small" color={variant === 'outline' || variant === 'ghost' ? '#1F5C3A' : '#ffffff'} className="mr-1.5" />
       ) : (
-        leftIcon && <span className="shrink-0">{leftIcon}</span>
+        leftIcon && <View className="shrink-0">{leftIcon}</View>
       )}
-      <span className="truncate whitespace-nowrap">{children}</span>
-      {!isLoading && rightIcon && <span className="shrink-0">{rightIcon}</span>}
-    </button>
+      {!React.isValidElement(children) ? (
+        <Text className={`${textClasses} ${textColorClass}`}>{children}</Text>
+      ) : (
+        children
+      )}
+      {!isLoading && rightIcon && <View className="shrink-0">{rightIcon}</View>}
+    </Pressable>
   );
 };

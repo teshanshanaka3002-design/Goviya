@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text, Pressable, Image, ScrollView, Linking } from 'react-native';
 import {
   ShieldCheck,
   MapPin,
@@ -7,11 +8,8 @@ import {
   Phone,
   Plus,
   Check,
-  Calendar,
-  Layers,
   Sparkles,
-  ExternalLink,
-} from 'lucide-react';
+} from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { BottomSheet } from '../ui/BottomSheet';
 import { Avatar } from '../ui/Avatar';
@@ -37,7 +35,6 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
 
   if (!farmerId) return null;
 
-  // Find farmer from users list or create a fallback from listings
   const farmerUser = users.find(u => u._id === farmerId && u.role === 'farmer');
   const farmerListings = listings.filter(
     l => l.farmerId === farmerId && (l.status === 'active' || l.status === 'out_of_stock')
@@ -59,6 +56,10 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
     goToSubScreen('chat_detail', { conversationId: convId });
   };
 
+  const handleCall = () => {
+    Linking.openURL(`tel:${farmPhone}`);
+  };
+
   const handleAddToCart = (listing: Listing) => {
     addToCart(listing, listing.minOrderKg || 5);
     setAddedListingIds(prev => ({ ...prev, [listing._id]: true }));
@@ -69,108 +70,111 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
 
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title="Seller & Farm Profile">
-      <div className="space-y-4 text-left pb-6 max-h-[80vh] overflow-y-auto">
+      <View style={{ gap: 16, paddingBottom: 24 }}>
         {/* Top Seller Card */}
-        <div className="bg-[#E6F2E8] border border-[#CDE5D2] rounded-2xl p-4 space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
+        <View className="bg-[#E6F2E8] border border-[#CDE5D2] rounded-2xl p-4" style={{ gap: 12 }}>
+          <View className="flex-row items-start justify-between">
+            <View className="flex-row items-start gap-3 flex-1">
               <Avatar name={farmerName} size="lg" role="farmer" />
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h3 className="text-base font-extrabold text-[#1A1A1A] leading-snug">
+              <View className="flex-1">
+                <View className="flex-row items-center gap-1.5">
+                  <Text className="text-base font-extrabold text-[#1A1A1A] flex-1">
                     {farmName}
-                  </h3>
-                  <span title="Agrarian Verified Producer">
-                    <ShieldCheck className="w-4 h-4 text-[#1F5C3A] shrink-0" />
-                  </span>
-                </div>
-                <p className="text-xs font-semibold text-[#1F5C3A] mt-0.5">
+                  </Text>
+                  <ShieldCheck size={16} color="#1F5C3A" />
+                </View>
+                <Text className="text-xs font-semibold text-[#1F5C3A] mt-0.5">
                   Producer: {farmerName}
-                </p>
-                <p className="text-xs text-[#4B6B56] flex items-center gap-1 mt-0.5">
-                  <MapPin className="w-3.5 h-3.5 text-[#1F5C3A] shrink-0" />
-                  <span>{farmTown}, {farmDistrict}</span>
-                </p>
-              </div>
-            </div>
+                </Text>
+                <View className="flex-row items-center gap-1 mt-0.5">
+                  <MapPin size={12} color="#1F5C3A" />
+                  <Text className="text-xs text-[#4B6B56]">
+                    {farmTown}, {farmDistrict}
+                  </Text>
+                </View>
+              </View>
+            </View>
 
-            <div className="flex items-center gap-1 bg-white/90 text-[#B45309] px-2.5 py-1 rounded-full text-xs font-black shadow-2xs shrink-0">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              <span>{rating.toFixed(1)}</span>
-            </div>
-          </div>
+            <View className="flex-row items-center gap-1 bg-white px-2.5 py-1 rounded-full">
+              <Star size={14} color="#FBBF24" fill="#FBBF24" />
+              <Text className="text-xs font-black text-[#B45309]">{rating.toFixed(1)}</Text>
+            </View>
+          </View>
 
           {/* Quick Metrics Badges */}
-          <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#CDE5D2]/70 text-center">
-            <div className="bg-white/80 p-2 rounded-xl">
-              <span className="text-[9px] uppercase font-bold text-[#4B6B56] block">Farm Size</span>
-              <span className="text-xs font-black text-[#1F5C3A]">{farmSize} Acres</span>
-            </div>
-            <div className="bg-white/80 p-2 rounded-xl">
-              <span className="text-[9px] uppercase font-bold text-[#4B6B56] block">Active Crops</span>
-              <span className="text-xs font-black text-[#1F5C3A]">{farmerListings.length} Listed</span>
-            </div>
-            <div className="bg-white/80 p-2 rounded-xl">
-              <span className="text-[9px] uppercase font-bold text-[#4B6B56] block">Verification</span>
-              <span className="text-xs font-black text-[#1F5C3A]">100% GAP</span>
-            </div>
-          </div>
+          <View className="flex-row gap-2 pt-2 border-t border-[#CDE5D2]">
+            <View className="flex-1 bg-white/80 p-2 rounded-xl items-center">
+              <Text className="text-[9px] uppercase font-bold text-[#4B6B56]">Farm Size</Text>
+              <Text className="text-xs font-black text-[#1F5C3A]">{farmSize} Acres</Text>
+            </View>
+            <View className="flex-1 bg-white/80 p-2 rounded-xl items-center">
+              <Text className="text-[9px] uppercase font-bold text-[#4B6B56]">Active Crops</Text>
+              <Text className="text-xs font-black text-[#1F5C3A]">{farmerListings.length} Listed</Text>
+            </View>
+            <View className="flex-1 bg-white/80 p-2 rounded-xl items-center">
+              <Text className="text-[9px] uppercase font-bold text-[#4B6B56]">Verification</Text>
+              <Text className="text-xs font-black text-[#1F5C3A]">100% GAP</Text>
+            </View>
+          </View>
 
           {/* MAIN ACTIONS: CHAT WITH SELLER & CALL */}
-          <div className="flex gap-2 pt-1">
+          <View className="flex-row gap-2 pt-1">
             <Button
               variant="primary"
               size="md"
-              className="flex-1 shadow-sm"
-              leftIcon={<MessageSquare className="w-4 h-4" />}
-              onClick={handleChatWithSeller}
+              className="flex-1"
+              leftIcon={<MessageSquare size={16} color="#ffffff" />}
+              onPress={handleChatWithSeller}
             >
               Chat with Seller
             </Button>
-            <a
-              href={`tel:${farmPhone}`}
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-[#CDE5D2] hover:bg-[#F3F4F6] text-[#1F5C3A] font-bold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer"
-              title="Call Farm Direct"
+            <Pressable
+              onPress={handleCall}
+              className="flex-row items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-[#CDE5D2] rounded-xl"
             >
-              <Phone className="w-3.5 h-3.5" />
-              <span>Call</span>
-            </a>
-          </div>
-        </div>
+              <Phone size={14} color="#1F5C3A" />
+              <Text className="font-bold text-xs text-[#1F5C3A]">Call</Text>
+            </Pressable>
+          </View>
+        </View>
 
         {/* Farm Bio & Guarantees */}
-        <div className="bg-white border border-[#E5E5E5] rounded-2xl p-3.5 space-y-2">
-          <h4 className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#1F5C3A]" />
-            <span>Farm Credentials & Harvest Guarantee</span>
-          </h4>
-          <p className="text-xs text-[#4B5563] leading-relaxed">
+        <View className="bg-white border border-[#E5E5E5] rounded-2xl p-3.5" style={{ gap: 8 }}>
+          <View className="flex-row items-center gap-1.5">
+            <Sparkles size={14} color="#1F5C3A" />
+            <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider">
+              Farm Credentials & Harvest Guarantee
+            </Text>
+          </View>
+          <Text className="text-xs text-[#4B5563] leading-relaxed">
             Registered smallholder farming holding with zero middleman markup. All crops are harvested at early dawn upon order receipt, graded for wholesale quality, and packed directly into ventilated agrarian crates for dispatch.
-          </p>
+          </Text>
 
-          <div className="pt-2 border-t border-[#F0F0EE] flex items-center justify-between text-[11px] text-[#6B7280]">
-            <span>Farm Gate Pickup:</span>
-            <span className="font-semibold text-[#1A1A1A] text-right truncate max-w-[200px]">
+          <View className="pt-2 border-t border-[#F0F0EE] flex-row items-center justify-between text-[11px] text-[#6B7280]">
+            <Text className="text-xs text-[#6B7280]">Farm Gate Pickup:</Text>
+            <Text className="text-xs font-semibold text-[#1A1A1A] text-right flex-1 ml-2" numberOfLines={1}>
               {farmAddress}
-            </span>
-          </div>
-        </div>
+            </Text>
+          </View>
+        </View>
 
         {/* Harvest Produce Catalog from this Seller */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <h4 className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider">
+        <View style={{ gap: 10 }}>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider">
               Available Crops from {farmerName} ({farmerListings.length})
-            </h4>
-            <span className="text-[10px] text-[#6B7280]">Direct from harvest</span>
-          </div>
+            </Text>
+            <Text className="text-[10px] text-[#6B7280]">Direct from harvest</Text>
+          </View>
 
           {farmerListings.length === 0 ? (
-            <div className="text-center py-6 bg-[#F9FAF8] rounded-2xl border border-dashed border-[#E5E5E5] text-xs text-[#6B7280]">
-              This seller currently has no active harvest listings available.
-            </div>
+            <View className="items-center py-6 bg-[#F9FAF8] rounded-2xl border border-dashed border-[#E5E5E5]">
+              <Text className="text-xs text-[#6B7280]">
+                This seller currently has no active harvest listings available.
+              </Text>
+            </View>
           ) : (
-            <div className="space-y-2">
+            <View style={{ gap: 8 }}>
               {farmerListings.map(listing => {
                 const isAdded = addedListingIds[listing._id];
                 const inCart = cart.some(c => c.listing._id === listing._id);
@@ -180,104 +184,98 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
                   (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http'));
 
                 return (
-                  <div
+                  <View
                     key={listing._id}
-                    className="p-3 bg-white rounded-2xl border border-[#E5E5E5] flex items-center justify-between gap-3 shadow-2xs hover:border-[#1F5C3A]/50 transition-colors"
+                    className="p-3 bg-white rounded-2xl border border-[#E5E5E5] flex-row items-center justify-between gap-3"
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#F6F7F5] shrink-0 border border-[#E5E5E5] flex items-center justify-center">
+                    <View className="flex-row items-center gap-2.5 flex-1">
+                      <View className="w-12 h-12 rounded-xl overflow-hidden bg-[#F6F7F5] shrink-0 border border-[#E5E5E5] items-center justify-center">
                         {hasPhoto ? (
-                          <img
-                            src={listing.photos[0]}
-                            alt={listing.cropName}
-                            className="w-full h-full object-cover"
+                          <Image
+                            source={{ uri: listing.photos[0] }}
+                            className="w-full h-full"
+                            resizeMode="cover"
                           />
                         ) : (
                           <ProduceVisual type={listing.cropName} size="sm" />
                         )}
-                      </div>
+                      </View>
 
-                      <div className="min-w-0">
-                        <h5 className="text-xs font-bold text-[#1A1A1A] truncate">
+                      <View className="flex-1">
+                        <Text className="text-xs font-bold text-[#1A1A1A]" numberOfLines={1}>
                           {listing.cropName}
-                        </h5>
-                        <p className="text-[10px] text-[#6B7280]">
+                        </Text>
+                        <Text className="text-[10px] text-[#6B7280]">
                           Stock: {listing.quantityKg} kg · Min: {listing.minOrderKg} kg
-                        </p>
-                        <div className="flex items-baseline gap-1 mt-0.5">
-                          <span className="text-xs font-extrabold text-[#1F5C3A]">
+                        </Text>
+                        <View className="flex-row items-baseline gap-1 mt-0.5">
+                          <Text className="text-xs font-extrabold text-[#1F5C3A]">
                             LKR {listing.pricePerKg.toLocaleString()}
-                          </span>
-                          <span className="text-[9px] text-[#9CA3AF]">/ kg</span>
-                        </div>
-                      </div>
-                    </div>
+                          </Text>
+                          <Text className="text-[9px] text-[#9CA3AF]">/ kg</Text>
+                        </View>
+                      </View>
+                    </View>
 
-                    <div className="shrink-0 flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
+                    <View className="shrink-0 flex-row items-center gap-1.5">
+                      <Pressable
+                        onPress={() => {
                           onClose();
                           goToSubScreen('product_detail', { listingId: listing._id });
                         }}
-                        className="px-2.5 py-1.5 text-[10px] font-bold text-[#4B6B56] hover:bg-[#F3F4F6] rounded-xl transition-colors cursor-pointer"
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100"
                       >
-                        View
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAddToCart(listing)}
-                        className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isAdded
-                            ? 'bg-[#1F5C3A] text-white'
-                            : inCart
-                            ? 'bg-[#E6F2E8] text-[#1F5C3A]'
-                            : 'bg-[#1F5C3A] text-white hover:bg-[#16452B] active:scale-95'
+                        <Text className="text-[10px] font-bold text-[#4B6B56]">View</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleAddToCart(listing)}
+                        className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl ${
+                          isAdded || !inCart ? 'bg-[#1F5C3A]' : 'bg-[#E6F2E8]'
                         }`}
                       >
                         {isAdded ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Added</span>
-                          </>
+                          <View className="flex-row items-center gap-1">
+                            <Check size={14} color="#ffffff" />
+                            <Text className="text-xs font-bold text-white">Added</Text>
+                          </View>
                         ) : inCart ? (
-                          <>
-                            <Check className="w-3 h-3" />
-                            <span>In Cart</span>
-                          </>
+                          <View className="flex-row items-center gap-1">
+                            <Check size={12} color="#1F5C3A" />
+                            <Text className="text-xs font-bold text-[#1F5C3A]">In Cart</Text>
+                          </View>
                         ) : (
-                          <>
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add</span>
-                          </>
+                          <View className="flex-row items-center gap-1">
+                            <Plus size={14} color="#ffffff" />
+                            <Text className="text-xs font-bold text-white">Add</Text>
+                          </View>
                         )}
-                      </button>
-                    </div>
-                  </div>
+                      </Pressable>
+                    </View>
+                  </View>
                 );
               })}
-            </div>
+            </View>
           )}
-        </div>
+        </View>
 
         {/* Secondary Chat Banner */}
-        <div className="p-3 bg-[#EEF8FA] border border-[#D0EEF5] rounded-2xl flex items-center justify-between text-xs">
-          <div>
-            <div className="font-bold text-[#19768A]">Need a custom harvest order?</div>
-            <p className="text-[10px] text-[#528796]">
+        <View className="p-3 bg-[#EEF8FA] border border-[#D0EEF5] rounded-2xl flex-row items-center justify-between">
+          <View className="flex-1 mr-2">
+            <Text className="font-bold text-xs text-[#19768A]">Need a custom harvest order?</Text>
+            <Text className="text-[10px] text-[#528796]">
               Negotiate crate sizes, harvest dates, or wholesale discounts directly with {farmerName}.
-            </p>
-          </div>
+            </Text>
+          </View>
           <Button
             variant="primary"
             size="sm"
-            onClick={handleChatWithSeller}
-            leftIcon={<MessageSquare className="w-3.5 h-3.5" />}
+            onPress={handleChatWithSeller}
+            leftIcon={<MessageSquare size={14} color="#ffffff" />}
           >
             Chat
           </Button>
-        </div>
-      </div>
+        </View>
+      </View>
     </BottomSheet>
   );
 };

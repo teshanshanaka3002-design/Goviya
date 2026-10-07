@@ -1,12 +1,17 @@
 import React from 'react';
-import { Search, X } from 'lucide-react';
+import { View, Text, TextInput, Pressable, TextInputProps } from 'react-native';
+import { Search, X } from 'lucide-react-native';
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<TextInputProps, 'onChange'> {
   label?: string;
   error?: string;
   helperText?: string;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  className?: string;
+  value?: string;
+  onChangeText?: (text: string) => void;
+  onChange?: (e: any) => void;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -16,48 +21,54 @@ export const Input: React.FC<InputProps> = ({
   leftIcon,
   rightIcon,
   className = '',
-  id,
+  value,
+  onChangeText,
+  onChange,
+  placeholder,
   ...props
 }) => {
-  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+  const handleChangeText = (text: string) => {
+    if (onChangeText) onChangeText(text);
+    if (onChange) onChange({ target: { value: text } });
+  };
 
   return (
-    <div className="w-full text-left">
+    <View className="w-full">
       {label && (
-        <label
-          htmlFor={inputId}
-          className="block text-xs font-semibold text-[#1A1A1A] mb-1.5 uppercase tracking-wider"
-        >
+        <Text className="text-xs font-semibold text-[#1A1A1A] mb-1.5 uppercase tracking-wider">
           {label}
-        </label>
+        </Text>
       )}
-      <div className="relative flex items-center">
+      <View className="relative flex-row items-center">
         {leftIcon && (
-          <div className="absolute left-3.5 text-[#6B7280] pointer-events-none flex items-center">
+          <View className="absolute left-3.5 z-10">
             {leftIcon}
-          </div>
+          </View>
         )}
-        <input
-          id={inputId}
-          className={`w-full h-11 min-h-[44px] bg-[#FFFFFF] border rounded-xl text-sm text-[#1A1A1A] placeholder-[#9CA3AF] transition-all focus:outline-none focus:ring-2 focus:ring-[#1F5C3A]/20 focus:border-[#1F5C3A] ${
+        <TextInput
+          value={value}
+          onChangeText={handleChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#9CA3AF"
+          className={`w-full h-11 min-h-[44px] bg-[#FFFFFF] border rounded-xl text-sm text-[#1A1A1A] ${
             leftIcon ? 'pl-10' : 'pl-3.5'
           } ${rightIcon ? 'pr-10' : 'pr-3.5'} ${
-            error ? 'border-[#C8452D] focus:border-[#C8452D] focus:ring-[#C8452D]/20' : 'border-[#E5E5E5]'
+            error ? 'border-[#C8452D]' : 'border-[#E5E5E5]'
           } ${className}`}
           {...props}
         />
         {rightIcon && (
-          <div className="absolute right-3.5 text-[#6B7280] flex items-center">
+          <View className="absolute right-3.5 z-10">
             {rightIcon}
-          </div>
+          </View>
         )}
-      </div>
+      </View>
       {error ? (
-        <p className="text-xs text-[#C8452D] mt-1 font-medium">{error}</p>
+        <Text className="text-xs text-[#C8452D] mt-1 font-medium">{error}</Text>
       ) : helperText ? (
-        <p className="text-xs text-[#6B7280] mt-1">{helperText}</p>
+        <Text className="text-xs text-[#6B7280] mt-1">{helperText}</Text>
       ) : null}
-    </div>
+    </View>
   );
 };
 
@@ -81,30 +92,30 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   className = '',
 }) => {
   return (
-    <div className={`relative flex items-center w-full ${className}`}>
-      <Search className="w-4 h-4 text-[#1F5C3A] absolute left-3.5 pointer-events-none" />
-      <input
-        type="text"
+    <View className={`relative flex-row items-center w-full ${className}`}>
+      <View className="absolute left-3.5 z-10">
+        <Search size={16} color="#1F5C3A" />
+      </View>
+      <TextInput
         value={value}
-        onChange={e => onChange(e.target.value)}
+        onChangeText={onChange}
         onFocus={onFocus}
         autoFocus={autoFocus}
         placeholder={placeholder}
-        className="w-full h-11 min-h-[44px] pl-10 pr-9 bg-[#E6F2E8]/60 hover:bg-[#E6F2E8]/90 focus:bg-white border border-transparent focus:border-[#1F5C3A] rounded-xl text-sm text-[#1A1A1A] placeholder-[#4B6B56] transition-all focus:outline-none focus:ring-2 focus:ring-[#1F5C3A]/15"
+        placeholderTextColor="#4B6B56"
+        className="w-full h-11 min-h-[44px] pl-10 pr-9 bg-[#E6F2E8] border border-transparent rounded-xl text-sm text-[#1A1A1A]"
       />
       {value.length > 0 && (
-        <button
-          type="button"
-          onClick={() => {
+        <Pressable
+          onPress={() => {
             onChange('');
             onClear?.();
           }}
-          className="absolute right-3 p-1 text-[#6B7280] hover:text-[#1A1A1A] rounded-full"
-          aria-label="Clear search"
+          className="absolute right-3 z-10 p-1 rounded-full"
         >
-          <X className="w-3.5 h-3.5" />
-        </button>
+          <X size={14} color="#6B7280" />
+        </Pressable>
       )}
-    </div>
+    </View>
   );
 };

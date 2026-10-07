@@ -1,11 +1,12 @@
 import React from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Home,
   MapPin,
   ShoppingCart,
   ShoppingBag,
   User,
-  TrendingUp,
   Package,
   Truck,
   DollarSign,
@@ -13,7 +14,7 @@ import {
   Users,
   Tag,
   AlertTriangle,
-} from 'lucide-react';
+} from 'lucide-react-native';
 import { Role } from '../../types';
 import { useApp } from '../../services/store';
 
@@ -23,6 +24,7 @@ export interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
   const { currentUser, navState, setTab, cart, orders, complaints } = useApp();
+  const insets = useSafeAreaInsets();
   const currentTab = navState.activeTab;
 
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
@@ -84,52 +86,122 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
   }[role] || [];
 
   return (
-    <nav
-      className="sticky bottom-0 z-20 w-full bg-white/95 backdrop-blur-md border-t border-[#E5E5E5] px-2 py-1 shadow-lg shrink-0"
-      aria-label="Bottom Navigation"
+    <View
+      style={[
+        styles.navContainer,
+        { paddingBottom: Math.max(insets.bottom, 8) },
+      ]}
     >
-      <div className="flex items-center justify-around max-w-lg mx-auto">
-        {tabsConfig.map(tab => {
-          const Icon = tab.icon;
-          const isActive = currentTab === tab.id;
+      {tabsConfig.map(tab => {
+        const Icon = tab.icon;
+        const isActive = currentTab === tab.id;
 
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setTab(tab.id)}
-              className={`relative flex flex-col items-center justify-center min-h-[48px] min-w-[56px] py-1 px-2 rounded-xl transition-all duration-150 active:scale-95 cursor-pointer ${
-                isActive
-                  ? 'text-[#1F5C3A] font-semibold'
-                  : 'text-[#6B7280] hover:text-[#1A1A1A]'
-              }`}
-            >
-              <div className="relative">
-                <Icon
-                  className={`w-5 h-5 transition-transform duration-150 ${
-                    isActive ? 'scale-110 stroke-[2.4]' : 'stroke-[1.8]'
-                  }`}
-                />
-                {tab.badge !== undefined && (
-                  <span className="absolute -top-1.5 -right-2 bg-[#C8452D] text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center leading-none ring-2 ring-white">
+        return (
+          <Pressable
+            key={tab.id}
+            onPress={() => setTab(tab.id)}
+            style={styles.tabButton}
+          >
+            <View style={styles.iconContainer}>
+              <Icon
+                size={21}
+                color={isActive ? '#1F5C3A' : '#6B7280'}
+                strokeWidth={isActive ? 2.4 : 1.8}
+              />
+              {tab.badge !== undefined && (
+                <View style={styles.badgePill}>
+                  <Text style={styles.badgeText}>
                     {tab.badge}
-                  </span>
-                )}
-              </div>
-              <span
-                className={`text-[11px] mt-1 tracking-tight truncate max-w-[64px] ${
-                  isActive ? 'font-semibold text-[#1F5C3A]' : 'font-normal'
-                }`}
-              >
-                {tab.label}
-              </span>
-              {isActive && (
-                <span className="absolute bottom-0 w-6 h-0.5 bg-[#1F5C3A] rounded-full" />
+                  </Text>
+                </View>
               )}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.tabLabel,
+                isActive ? styles.tabLabelActive : styles.tabLabelInactive,
+              ]}
+            >
+              {tab.label}
+            </Text>
+            {isActive && (
+              <View style={styles.activeIndicator} />
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  navContainer: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#EAEAEA',
+    paddingTop: 8,
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  tabButton: {
+    position: 'relative',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    minWidth: 54,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  iconContainer: {
+    position: 'relative',
+  },
+  badgePill: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#C8452D',
+    borderRadius: 8,
+    height: 16,
+    minWidth: 16,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
+  tabLabel: {
+    fontSize: 11,
+    marginTop: 3,
+    maxWidth: 68,
+  },
+  tabLabelActive: {
+    fontWeight: '700',
+    color: '#1F5C3A',
+  },
+  tabLabelInactive: {
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: -2,
+    width: 20,
+    height: 3,
+    backgroundColor: '#1F5C3A',
+    borderRadius: 2,
+  },
+});

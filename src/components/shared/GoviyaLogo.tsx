@@ -1,4 +1,16 @@
 import React from 'react';
+import { View, Text } from 'react-native';
+import Svg, {
+  G,
+  Rect,
+  Path,
+  Circle,
+  Ellipse,
+  Defs,
+  LinearGradient,
+  RadialGradient,
+  Stop,
+} from 'react-native-svg';
 
 interface GoviyaLogoProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | number;
@@ -19,7 +31,6 @@ export const GoviyaLogo: React.FC<GoviyaLogoProps> = ({
   tagline,
   className = '',
 }) => {
-  // Dimension mapping
   let dimension = 36;
   if (typeof size === 'number') {
     dimension = size;
@@ -49,102 +60,85 @@ export const GoviyaLogo: React.FC<GoviyaLogoProps> = ({
   const isWhite = variant === 'white';
 
   return (
-    <div className={`inline-flex items-center gap-2.5 ${className}`}>
-      {/* SVG Icon Emblem */}
-      <svg
+    <View className={`flex-row items-center gap-2.5 ${className}`}>
+      <Svg
         width={dimension}
         height={dimension}
         viewBox="0 0 100 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="shrink-0 drop-shadow-sm select-none"
       >
-        <defs>
-          {/* Emerald Forest Gradient */}
-          <linearGradient id="goviyaBgGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#1B4D30" />
-            <stop offset="50%" stopColor="#1F5C3A" />
-            <stop offset="100%" stopColor="#143D26" />
-          </linearGradient>
+        <Defs>
+          <LinearGradient id="goviyaBgGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+            <Stop offset="0%" stopColor="#1B4D30" />
+            <Stop offset="50%" stopColor="#1F5C3A" />
+            <Stop offset="100%" stopColor="#143D26" />
+          </LinearGradient>
 
-          {/* Leaf / Sprout Green Gradient */}
-          <linearGradient id="leafGrad" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#4ADE80" />
-            <stop offset="60%" stopColor="#22C55E" />
-            <stop offset="100%" stopColor="#16A34A" />
-          </linearGradient>
+          <LinearGradient id="leafGrad" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+            <Stop offset="0%" stopColor="#4ADE80" />
+            <Stop offset="60%" stopColor="#22C55E" />
+            <Stop offset="100%" stopColor="#16A34A" />
+          </LinearGradient>
 
-          {/* Golden Rice Sheaf Gradient */}
-          <linearGradient id="goldPaddyGrad" x1="30" y1="10" x2="90" y2="70" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FDE047" />
-            <stop offset="40%" stopColor="#EAB308" />
-            <stop offset="100%" stopColor="#CA8A04" />
-          </linearGradient>
+          <LinearGradient id="goldPaddyGrad" x1="30" y1="10" x2="90" y2="70" gradientUnits="userSpaceOnUse">
+            <Stop offset="0%" stopColor="#FDE047" />
+            <Stop offset="40%" stopColor="#EAB308" />
+            <Stop offset="100%" stopColor="#CA8A04" />
+          </LinearGradient>
 
-          {/* Sun Glow */}
-          <radialGradient id="sunGlow" cx="62" cy="38" r="24" fx="62" fy="38" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#FEF08A" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.1" />
-          </radialGradient>
-        </defs>
+          <RadialGradient id="sunGlow" cx="62" cy="38" r="24" fx="62" fy="38" gradientUnits="userSpaceOnUse">
+            <Stop offset="0%" stopColor="#FEF08A" stopOpacity="0.9" />
+            <Stop offset="100%" stopColor="#F59E0B" stopOpacity="0.1" />
+          </RadialGradient>
+        </Defs>
 
         {isWhite ? (
-          // White variant container (e.g., inside emerald badge)
-          <>
-            <rect width="100" height="100" rx="26" fill="#FFFFFF" />
-            {/* Sunrise Warmth */}
-            <circle cx="60" cy="36" r="16" fill="#FEF3C7" />
-            {/* Soil / Furrow Curves */}
-            <path
+          <G>
+            <Rect width="100" height="100" rx="26" fill="#FFFFFF" />
+            <Circle cx="60" cy="36" r="16" fill="#FEF3C7" />
+            <Path
               d="M16 80 C 35 72, 65 72, 84 80"
               stroke="#D97706"
               strokeWidth="3.5"
               strokeLinecap="round"
             />
-            <path
+            <Path
               d="M22 86 C 40 80, 60 80, 78 86"
               stroke="#E5E7EB"
               strokeWidth="2.5"
               strokeLinecap="round"
             />
-            {/* Golden Rice Sheaf Right Curve */}
-            <path
+            <Path
               d="M50 74 C 50 56, 68 40, 78 30"
               stroke="url(#goldPaddyGrad)"
               strokeWidth="4"
               strokeLinecap="round"
             />
-            <path
+            <Path
               d="M60 48 Q 72 44, 76 34"
               stroke="url(#goldPaddyGrad)"
               strokeWidth="3.5"
               strokeLinecap="round"
             />
-            <path
+            <Path
               d="M68 60 Q 80 56, 82 46"
               stroke="url(#goldPaddyGrad)"
               strokeWidth="3.5"
               strokeLinecap="round"
             />
-            {/* Vibrant Sprout Leaf Left Curve */}
-            <path
+            <Path
               d="M50 74 C 48 50, 32 36, 20 34 C 20 54, 38 68, 50 74 Z"
               fill="url(#leafGrad)"
             />
-            {/* Central Sprout Leaf Center Stem */}
-            <path
+            <Path
               d="M50 74 C 50 44, 42 22, 40 18 C 54 26, 56 48, 50 74 Z"
               fill="#15803D"
             />
-            {/* Center Growth Seed Drop */}
-            <circle cx="50" cy="74" r="4.5" fill="#1F5C3A" />
-          </>
+            <Circle cx="50" cy="74" r="4.5" fill="#1F5C3A" />
+          </G>
         ) : (
-          // Vibrant Color Badge
-          <>
-            {/* Outer Rounded Squircle with subtle border */}
-            <rect width="100" height="100" rx="26" fill="url(#goviyaBgGrad)" />
-            <rect
+          <G>
+            <Rect width="100" height="100" rx="26" fill="url(#goviyaBgGrad)" />
+            <Rect
               x="2"
               y="2"
               width="96"
@@ -155,92 +149,79 @@ export const GoviyaLogo: React.FC<GoviyaLogoProps> = ({
               strokeWidth="1.5"
               fill="none"
             />
-
-            {/* Radiant Agri Sun in Background */}
-            <circle cx="64" cy="36" r="16" fill="url(#sunGlow)" />
-            <circle cx="64" cy="36" r="11" fill="#FBBF24" fillOpacity="0.95" />
-
-            {/* Earth & Fertile Field Furrows */}
-            <path
+            <Circle cx="64" cy="36" r="16" fill="url(#sunGlow)" />
+            <Circle cx="64" cy="36" r="11" fill="#FBBF24" fillOpacity="0.95" />
+            <Path
               d="M16 80 C 35 73, 65 73, 84 80"
               stroke="#F59E0B"
               strokeWidth="3.2"
               strokeLinecap="round"
               strokeOpacity="0.85"
             />
-            <path
+            <Path
               d="M24 87 C 40 82, 60 82, 76 87"
               stroke="#A7F3D0"
               strokeWidth="2.2"
               strokeLinecap="round"
               strokeOpacity="0.4"
             />
-
-            {/* Golden Paddy Rice Sheaf Arching to the Right */}
-            <path
+            <Path
               d="M50 76 C 52 58, 68 42, 78 30"
               stroke="url(#goldPaddyGrad)"
               strokeWidth="4"
               strokeLinecap="round"
             />
-            {/* Rice Grain Grains */}
-            <ellipse cx="64" cy="44" rx="4.2" ry="2.6" transform="rotate(-30 64 44)" fill="#FDE047" />
-            <ellipse cx="73" cy="38" rx="4.2" ry="2.6" transform="rotate(-40 73 38)" fill="#FDE047" />
-            <ellipse cx="79" cy="28" rx="3.8" ry="2.4" transform="rotate(-55 79 28)" fill="#FEF08A" />
-            <ellipse cx="70" cy="54" rx="4.2" ry="2.6" transform="rotate(-25 70 54)" fill="#EAB308" />
-
-            {/* Lush Fresh Sprout Leaf on Left */}
-            <path
+            <Ellipse cx="64" cy="44" rx="4.2" ry="2.6" transform="rotate(-30 64 44)" fill="#FDE047" />
+            <Ellipse cx="73" cy="38" rx="4.2" ry="2.6" transform="rotate(-40 73 38)" fill="#FDE047" />
+            <Ellipse cx="79" cy="28" rx="3.8" ry="2.4" transform="rotate(-55 79 28)" fill="#FEF08A" />
+            <Ellipse cx="70" cy="54" rx="4.2" ry="2.6" transform="rotate(-25 70 54)" fill="#EAB308" />
+            <Path
               d="M50 76 C 48 50, 30 36, 18 34 C 18 54, 38 70, 50 76 Z"
               fill="url(#leafGrad)"
             />
-            {/* Central Sprout Leaf Center */}
-            <path
+            <Path
               d="M50 76 C 50 44, 42 22, 40 18 C 54 26, 56 50, 50 76 Z"
               fill="#86EFAC"
             />
-
-            {/* Base Seed Node */}
-            <circle cx="50" cy="76" r="4.5" fill="#FEF08A" />
-          </>
+            <Circle cx="50" cy="76" r="4.5" fill="#FEF08A" />
+          </G>
         )}
-      </svg>
+      </Svg>
 
-      {/* Optional Brand Typography */}
       {withText && (
-        <div className="flex flex-col justify-center leading-tight">
-          <div className="flex items-baseline gap-1.5">
-            <span
+        <View className="flex-col justify-center">
+          <View className="flex-row items-baseline gap-1.5">
+            <Text
               className={`text-lg font-black tracking-tight ${
                 textColor || (isWhite ? 'text-white' : 'text-[#1A1A1A]')
               }`}
             >
               Goviya
-            </span>
-            <span className="text-[10px] font-bold text-[#10B981] bg-[#ECFDF5] px-1.5 py-0.2 rounded-md">
-              LK
-            </span>
-          </div>
+            </Text>
+            <View className="bg-[#ECFDF5] px-1.5 py-0.5 rounded-md">
+              <Text className="text-[10px] font-bold text-[#10B981]">LK</Text>
+            </View>
+          </View>
           {tagline ? (
-            <span
+            <Text
               className={`text-[10px] font-semibold tracking-wide ${
                 subtextColor || (isWhite ? 'text-white/80' : 'text-[#6B7280]')
               }`}
             >
               {tagline}
-            </span>
+            </Text>
           ) : (
-            <span
+            <Text
               className={`text-[10px] font-medium ${
                 subtextColor || (isWhite ? 'text-white/70' : 'text-[#6B7280]')
               }`}
             >
               Farm to Market
-            </span>
+            </Text>
           )}
-        </div>
+        </View>
       )}
-    </div>
+    </View>
   );
 };
 

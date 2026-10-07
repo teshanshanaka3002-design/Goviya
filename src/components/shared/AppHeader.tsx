@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { View, Text, Pressable, Modal } from 'react-native';
 import {
   ChevronLeft,
   ShoppingCart,
@@ -7,8 +8,7 @@ import {
   LogIn,
   LogOut,
   Lock,
-  User as UserIcon,
-} from 'lucide-react';
+} from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { Role } from '../../types';
 import { GoviyaLogo } from './GoviyaLogo';
@@ -69,238 +69,207 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const currentBadge = roleBadges[currentRole];
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-white/95 backdrop-blur-md border-b border-[#E5E5E5] px-4 py-2.5 shadow-2xs">
-      <div className="flex items-center justify-between gap-2 max-w-lg mx-auto">
-        {/* Left Slot: Back or Logo */}
-        <div className="flex items-center gap-2">
+    <View className="w-full bg-white border-b border-[#E5E5E5] px-4 py-2.5 z-30">
+      <View className="flex-row items-center justify-between">
+        {/* Left Slot */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 6 }}>
           {showBack || navState.subScreen ? (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="p-2 -ml-1 text-[#1A1A1A] hover:bg-[#F3F4F6] rounded-xl transition-colors active:scale-95 cursor-pointer"
-              aria-label="Go back"
+            <Pressable
+              onPress={handleBack}
+              style={{ padding: 6, marginLeft: -4, borderRadius: 10, backgroundColor: '#F1F5F9' }}
             >
-              <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
-            </button>
+              <ChevronLeft size={20} color="#1A1A1A" strokeWidth={2.5} />
+            </Pressable>
           ) : (
-            <div className="flex items-center gap-2">
-              <GoviyaLogo size={32} />
-              <div>
-                <h1 className="text-base font-extrabold text-[#1A1A1A] tracking-tight leading-none">
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+              <GoviyaLogo size={28} />
+              <View style={{ flexShrink: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A', lineHeight: 18 }}>
                   Goviya
-                </h1>
-                <p className="text-[10px] text-[#6B7280] font-medium leading-tight">
+                </Text>
+                <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '500' }} numberOfLines={1}>
                   {roleTitles[currentRole]}
-                </p>
-              </div>
-            </div>
+                </Text>
+              </View>
+            </View>
           )}
 
           {title && (
-            <h2 className="text-sm font-bold text-[#1A1A1A] truncate max-w-[170px] ml-1">
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1A1A', flex: 1, marginLeft: 4 }} numberOfLines={1}>
               {title}
-            </h2>
+            </Text>
           )}
-        </div>
+        </View>
 
-        {/* Right Slot: Actions, Role Selector Pill, Sign In / Cart */}
-        <div className="flex items-center gap-1.5">
+        {/* Right Slot */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {rightAction ? (
             rightAction
           ) : (
-            <>
-              {/* Unauthenticated Quick Sign-In Button */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               {!currentUser && !navState.subScreen && (
-                <button
-                  type="button"
-                  onClick={() => openAuth('buyer')}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#1F5C3A] text-white hover:bg-[#16452B] active:scale-95 transition-all shadow-2xs cursor-pointer"
-                  title="Sign In or Register"
+                <Pressable
+                  onPress={() => openAuth('buyer')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4.5, borderRadius: 16, backgroundColor: '#1F5C3A' }}
                 >
-                  <LogIn className="w-3 h-3" />
-                  <span>Sign In</span>
-                </button>
+                  <LogIn size={11} color="#ffffff" />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>Sign In</Text>
+                </Pressable>
               )}
 
               {/* Role Switcher Pill */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowRoleMenu(prev => !prev)}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${currentBadge.bg} ${currentBadge.text} border border-black/5 hover:opacity-90 active:scale-95 transition-all cursor-pointer`}
-                  title="Switch Stakeholder Dashboard"
-                >
-                  <Shuffle className="w-3 h-3" />
-                  <span>{currentBadge.label}</span>
-                </button>
-
-                {showRoleMenu && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setShowRoleMenu(false)}
-                    />
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-[#E5E5E5] p-2 z-50 text-left animate-fadeIn">
-                      <div className="px-2.5 py-1 text-[10px] uppercase font-bold text-[#9CA3AF] tracking-wider">
-                        Switch Stakeholder Dashboard
-                      </div>
-
-                      {/* Buyer Option: Always accessible without login */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          switchRole('buyer');
-                          setShowRoleMenu(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          currentRole === 'buyer'
-                            ? 'bg-[#E6F2E8] text-[#1F5C3A] font-bold'
-                            : 'text-[#374151] hover:bg-[#F3F4F6]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>🛒</span>
-                          <span>Buyer (No login needed)</span>
-                        </div>
-                        {currentRole === 'buyer' && <Check className="w-3.5 h-3.5" />}
-                      </button>
-
-                      {/* Farmer Option: Requires farmer login/signup */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          switchRole('farmer');
-                          setShowRoleMenu(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          currentRole === 'farmer'
-                            ? 'bg-[#FEF8EA] text-[#B45309] font-bold'
-                            : 'text-[#374151] hover:bg-[#F3F4F6]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>🌱</span>
-                          <span>Farmer Dashboard</span>
-                        </div>
-                        {currentUser?.role === 'farmer' ? (
-                          currentRole === 'farmer' ? <Check className="w-3.5 h-3.5" /> : null
-                        ) : (
-                          <span title="Login required">
-                            <Lock className="w-3 h-3 text-[#9CA3AF]" />
-                          </span>
-                        )}
-                      </button>
-
-                      {/* Driver Option: Requires driver login/signup */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          switchRole('driver');
-                          setShowRoleMenu(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          currentRole === 'driver'
-                            ? 'bg-[#EEF8FA] text-[#19768A] font-bold'
-                            : 'text-[#374151] hover:bg-[#F3F4F6]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>🚚</span>
-                          <span>Driver Logistics</span>
-                        </div>
-                        {currentUser?.role === 'driver' ? (
-                          currentRole === 'driver' ? <Check className="w-3.5 h-3.5" /> : null
-                        ) : (
-                          <span title="Login required">
-                            <Lock className="w-3 h-3 text-[#9CA3AF]" />
-                          </span>
-                        )}
-                      </button>
-
-                      {/* Admin Option */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          switchRole('admin');
-                          setShowRoleMenu(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                          currentRole === 'admin'
-                            ? 'bg-[#F3E8FF] text-[#7C3AED] font-bold'
-                            : 'text-[#374151] hover:bg-[#F3F4F6]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span>🛡️</span>
-                          <span>Platform Admin</span>
-                        </div>
-                        {currentUser?.role === 'admin' ? (
-                          currentRole === 'admin' ? <Check className="w-3.5 h-3.5" /> : null
-                        ) : (
-                          <span title="Login required">
-                            <Lock className="w-3 h-3 text-[#9CA3AF]" />
-                          </span>
-                        )}
-                      </button>
-
-                      {/* User Account / Auth Actions */}
-                      <div className="mt-1.5 pt-1.5 border-t border-[#F0F0EE]">
-                        {currentUser ? (
-                          <div className="px-2 py-1 space-y-1">
-                            <div className="text-[10px] text-[#6B7280] truncate">
-                              Signed in as <strong className="text-[#1A1A1A]">{currentUser.name}</strong>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                logout();
-                                setShowRoleMenu(false);
-                              }}
-                              className="w-full flex items-center gap-1.5 text-xs text-[#DC2626] font-semibold hover:bg-[#FEF2F2] p-1.5 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <LogOut className="w-3.5 h-3.5" />
-                              <span>Sign Out (Browse as Guest)</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              openAuth(currentRole);
-                              setShowRoleMenu(false);
-                            }}
-                            className="w-full flex items-center justify-center gap-1 text-xs text-[#1F5C3A] font-bold bg-[#E6F2E8] hover:bg-[#D5EAD8] p-2 rounded-xl transition-colors cursor-pointer"
-                          >
-                            <LogIn className="w-3.5 h-3.5" />
-                            <span>Sign In / Create Account</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
+              <Pressable
+                onPress={() => setShowRoleMenu(true)}
+                className={`flex-row items-center gap-1 px-2.5 py-1 rounded-full border border-black/5 ${currentBadge.bg}`}
+              >
+                <Shuffle size={11} color={currentRole === 'farmer' ? '#B45309' : currentRole === 'driver' ? '#19768A' : currentRole === 'admin' ? '#7C3AED' : '#1F5C3A'} />
+                <Text className={`text-xs font-semibold ${currentBadge.text}`}>
+                  {currentBadge.label}
+                </Text>
+              </Pressable>
 
               {/* Buyer Cart Icon */}
               {currentRole === 'buyer' && !navState.subScreen && (
-                <button
-                  type="button"
-                  onClick={() => setTab('cart')}
-                  className="relative p-2 text-[#1A1A1A] hover:bg-[#F3F4F6] rounded-xl transition-colors cursor-pointer"
-                  aria-label="View Cart"
+                <Pressable
+                  onPress={() => setTab('cart')}
+                  style={{ position: 'relative', padding: 6, borderRadius: 10 }}
                 >
-                  <ShoppingCart className="w-5 h-5 text-[#1F5C3A]" />
+                  <ShoppingCart size={19} color="#1F5C3A" />
                   {cart.length > 0 && (
-                    <span className="absolute top-1 right-1 bg-[#C8452D] text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center ring-2 ring-white">
-                      {cart.length}
-                    </span>
+                    <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#C8452D', borderRadius: 8, height: 16, minWidth: 16, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ color: '#ffffff', fontSize: 9.5, fontWeight: '800', lineHeight: 12 }}>
+                        {cart.length}
+                      </Text>
+                    </View>
                   )}
-                </button>
+                </Pressable>
               )}
-            </>
+            </View>
           )}
-        </div>
-      </div>
-    </header>
+        </View>
+      </View>
+
+      {/* Role Selector Modal */}
+      <Modal
+        visible={showRoleMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowRoleMenu(false)}
+      >
+        <Pressable
+          className="flex-1 bg-black/50 items-center justify-center p-4"
+          onPress={() => setShowRoleMenu(false)}
+        >
+          <View className="w-full max-w-sm bg-white rounded-2xl p-4 shadow-xl border border-[#E5E5E5]">
+            <Text className="text-[10px] uppercase font-bold text-[#9CA3AF] tracking-wider mb-2">
+              Switch Stakeholder Dashboard
+            </Text>
+
+            {/* Buyer */}
+            <Pressable
+              onPress={() => {
+                switchRole('buyer');
+                setShowRoleMenu(false);
+              }}
+              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
+                currentRole === 'buyer' ? 'bg-[#E6F2E8]' : 'bg-slate-50'
+              }`}
+            >
+              <Text className="text-xs font-medium text-[#374151]">🛒 Buyer (No login needed)</Text>
+              {currentRole === 'buyer' && <Check size={14} color="#1F5C3A" />}
+            </Pressable>
+
+            {/* Farmer */}
+            <Pressable
+              onPress={() => {
+                switchRole('farmer');
+                setShowRoleMenu(false);
+              }}
+              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
+                currentRole === 'farmer' ? 'bg-[#FEF8EA]' : 'bg-slate-50'
+              }`}
+            >
+              <Text className="text-xs font-medium text-[#374151]">🌱 Farmer Dashboard</Text>
+              {currentUser?.role === 'farmer' ? (
+                currentRole === 'farmer' ? <Check size={14} color="#B45309" /> : null
+              ) : (
+                <Lock size={12} color="#9CA3AF" />
+              )}
+            </Pressable>
+
+            {/* Driver */}
+            <Pressable
+              onPress={() => {
+                switchRole('driver');
+                setShowRoleMenu(false);
+              }}
+              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
+                currentRole === 'driver' ? 'bg-[#EEF8FA]' : 'bg-slate-50'
+              }`}
+            >
+              <Text className="text-xs font-medium text-[#374151]">🚚 Driver Logistics</Text>
+              {currentUser?.role === 'driver' ? (
+                currentRole === 'driver' ? <Check size={14} color="#19768A" /> : null
+              ) : (
+                <Lock size={12} color="#9CA3AF" />
+              )}
+            </Pressable>
+
+            {/* Admin */}
+            <Pressable
+              onPress={() => {
+                switchRole('admin');
+                setShowRoleMenu(false);
+              }}
+              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
+                currentRole === 'admin' ? 'bg-[#F3E8FF]' : 'bg-slate-50'
+              }`}
+            >
+              <Text className="text-xs font-medium text-[#374151]">🛡️ Platform Admin</Text>
+              {currentUser?.role === 'admin' ? (
+                currentRole === 'admin' ? <Check size={14} color="#7C3AED" /> : null
+              ) : (
+                <Lock size={12} color="#9CA3AF" />
+              )}
+            </Pressable>
+
+            <View className="mt-2 pt-2 border-t border-[#E5E5E5]">
+              {currentUser ? (
+                <View style={{ gap: 8 }}>
+                  <Text className="text-[11px] text-[#6B7280]">
+                    Signed in as <Text className="font-bold text-[#1A1A1A]">{currentUser.name}</Text>
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      logout();
+                      setShowRoleMenu(false);
+                    }}
+                    className="flex-row items-center gap-1.5 p-2 rounded-lg bg-red-50"
+                  >
+                    <LogOut size={14} color="#DC2626" />
+                    <Text className="text-xs font-semibold text-[#DC2626]">
+                      Sign Out (Browse as Guest)
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    openAuth(currentRole);
+                    setShowRoleMenu(false);
+                  }}
+                  className="flex-row items-center justify-center gap-1 p-2.5 rounded-xl bg-[#E6F2E8]"
+                >
+                  <LogIn size={14} color="#1F5C3A" />
+                  <Text className="text-xs font-bold text-[#1F5C3A]">
+                    Sign In / Create Account
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
   );
 };

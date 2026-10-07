@@ -1,0 +1,28 @@
+<svg width="64" height="64" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goviyaBgGradFav" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#1B4D30" />
+      <stop offset="50%" stopColor="#1F5C3A" />
+      <stop offset="100%" stopColor="#143D26" />
+    </linearGradient>
+    <linearGradient id="leafGradFav" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#4ADE80" />
+      <stop offset="100%" stopColor="#16A34A" />
+    </linearGradient>
+    <linearGradient id="goldPaddyGradFav" x1="30" y1="10" x2="90" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FDE047" />
+      <stop offset="100%" stopColor="#EAB308" />
+    </linearGradient>
+  </defs>
+
+  <rect width="100" height="100" rx="28" fill="url(#goviyaBgGradFav)" />
+  <circle cx="64" cy="36" r="14" fill="#FBBF24" />
+  <path d="M16 80 C 35 73, 65 73, 84 80" stroke="#F59E0B" stroke-width="4" stroke-linecap="round" />
+  <path d="M50 76 C 52 58, 68 42, 78 30" stroke="url(#goldPaddyGradFav)" stroke-width="5" stroke-linecap="round" />
+  <ellipse cx="64" cy="44" rx="5" ry="3" transform="rotate(-30 64 44)" fill="#FDE047" />
+  <ellipse cx="73" cy="38" rx="5" ry="3" transform="rotate(-40 73 38)" fill="#FDE047" />
+  <ellipse cx="79" cy="28" rx="4.5" ry="2.7" transform="rotate(-55 79 28)" fill="#FEF08A" />
+  <path d="M50 76 C 48 50, 30 36, 18 34 C 18 54, 38 70, 50 76 Z" fill="url(#leafGradFav)" />
+  <path d="M50 76 C 50 44, 42 22, 40 18 C 54 26, 56 50, 50 76 Z" fill="#86EFAC" />
+  <circle cx="50" cy="76" r="5" fill="#FEF08A" />
+</svg>

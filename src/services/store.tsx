@@ -137,15 +137,40 @@ const AppContext = createContext<AppContextType | null>(null);
 
 const STORAGE_PREFIX = 'goviya_v1_';
 
+const safeStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem(key);
+      }
+    } catch (e) {}
+    return null;
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(key, value);
+      }
+    } catch (e) {}
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(key);
+      }
+    } catch (e) {}
+  },
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Simulator frame toggle
   const [isSimulatorFrame, setIsSimulatorFrame] = useState<boolean>(() => {
-    return window.innerWidth > 900;
+    return typeof window !== 'undefined' ? window.innerWidth > 900 : false;
   });
 
   // Current user & role
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'user');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'user');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { /* ignore */ }
     }
@@ -171,12 +196,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Data Collections
   const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'users');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'users');
     return saved ? JSON.parse(saved) : mockUsers;
   });
 
   const [listings, setListings] = useState<Listing[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'listings');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'listings');
     if (!saved) return mockListings;
     try {
       const parsed: Listing[] = JSON.parse(saved);
@@ -189,29 +214,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'orders');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'orders');
     return saved ? JSON.parse(saved) : mockOrders;
   });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'cart');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'cart');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [conversations, setConversations] = useState<Conversation[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'conversations');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'conversations');
     return saved ? JSON.parse(saved) : mockConversations;
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'messages');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'messages');
     return saved ? JSON.parse(saved) : mockChatMessages;
   });
 
   const [marketPrices] = useState<MarketPriceRecord[]>(mockMarketPrices);
 
   const [complaints, setComplaints] = useState<Complaint[]>(() => {
-    const saved = localStorage.getItem(STORAGE_PREFIX + 'complaints');
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'complaints');
     return saved ? JSON.parse(saved) : mockComplaints;
   });
 
@@ -220,38 +245,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync to localStorage
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem(STORAGE_PREFIX + 'user', JSON.stringify(currentUser));
+      safeStorage.setItem(STORAGE_PREFIX + 'user', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem(STORAGE_PREFIX + 'user');
+      safeStorage.removeItem(STORAGE_PREFIX + 'user');
     }
   }, [currentUser]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'cart', JSON.stringify(cart));
+    safeStorage.setItem(STORAGE_PREFIX + 'cart', JSON.stringify(cart));
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'orders', JSON.stringify(orders));
+    safeStorage.setItem(STORAGE_PREFIX + 'orders', JSON.stringify(orders));
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'listings', JSON.stringify(listings));
+    safeStorage.setItem(STORAGE_PREFIX + 'listings', JSON.stringify(listings));
   }, [listings]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(complaints));
+    safeStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(complaints));
   }, [complaints]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
+    safeStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
   }, [users]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'conversations', JSON.stringify(conversations));
+    safeStorage.setItem(STORAGE_PREFIX + 'conversations', JSON.stringify(conversations));
   }, [conversations]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_PREFIX + 'messages', JSON.stringify(messages));
+    safeStorage.setItem(STORAGE_PREFIX + 'messages', JSON.stringify(messages));
   }, [messages]);
 
   // Actions

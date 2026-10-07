@@ -1,0 +1,43 @@
+<svg width="256" height="256" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goviyaBgGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#1B4D30" />
+      <stop offset="50%" stopColor="#1F5C3A" />
+      <stop offset="100%" stopColor="#143D26" />
+    </linearGradient>
+    <linearGradient id="leafGrad" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#4ADE80" />
+      <stop offset="60%" stopColor="#22C55E" />
+      <stop offset="100%" stopColor="#16A34A" />
+    </linearGradient>
+    <linearGradient id="goldPaddyGrad" x1="30" y1="10" x2="90" y2="70" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FDE047" />
+      <stop offset="40%" stopColor="#EAB308" />
+      <stop offset="100%" stopColor="#CA8A04" />
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="64" cy="36" r="24" fx="64" fy="36" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#FEF08A" stopOpacity="0.9" />
+      <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.1" />
+    </radialGradient>
+  </defs>
+
+  <rect width="100" height="100" rx="26" fill="url(#goviyaBgGrad)" />
+  <rect x="2" y="2" width="96" height="96" rx="24" stroke="#34D399" stroke-opacity="0.25" stroke-width="1.5" fill="none" />
+
+  <circle cx="64" cy="36" r="16" fill="url(#sunGlow)" />
+  <circle cx="64" cy="36" r="11" fill="#FBBF24" fill-opacity="0.95" />
+
+  <path d="M16 80 C 35 73, 65 73, 84 80" stroke="#F59E0B" stroke-width="3.2" stroke-linecap="round" stroke-opacity="0.85" />
+  <path d="M24 87 C 40 82, 60 82, 76 87" stroke="#A7F3D0" stroke-width="2.2" stroke-linecap="round" stroke-opacity="0.4" />
+
+  <path d="M50 76 C 52 58, 68 42, 78 30" stroke="url(#goldPaddyGrad)" stroke-width="4" stroke-linecap="round" />
+  <ellipse cx="64" cy="44" rx="4.2" ry="2.6" transform="rotate(-30 64 44)" fill="#FDE047" />
+  <ellipse cx="73" cy="38" rx="4.2" ry="2.6" transform="rotate(-40 73 38)" fill="#FDE047" />
+  <ellipse cx="79" cy="28" rx="3.8" ry="2.4" transform="rotate(-55 79 28)" fill="#FEF08A" />
+  <ellipse cx="70" cy="54" rx="4.2" ry="2.6" transform="rotate(-25 70 54)" fill="#EAB308" />
+
+  <path d="M50 76 C 48 50, 30 36, 18 34 C 18 54, 38 70, 50 76 Z" fill="url(#leafGrad)" />
+  <path d="M50 76 C 50 44, 42 22, 40 18 C 54 26, 56 50, 50 76 Z" fill="#86EFAC" />
+
+  <circle cx="50" cy="76" r="4.5" fill="#FEF08A" />
+</svg>
