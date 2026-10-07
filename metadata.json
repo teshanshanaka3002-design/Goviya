@@ -1,0 +1,6 @@
+{
+  "name": "Goviya - Direct Agri Marketplace Sri Lanka",
+  "description": "Mobile marketplace connecting small-scale farmers directly with buyers in Sri Lanka with fair prices, logistics delivery tracking, and transparent market index.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
