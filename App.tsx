@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Platform, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/services/store';
@@ -16,16 +16,17 @@ const MainNavigator: React.FC = () => {
 
   const isSubScreenActive = Boolean(navState.subScreen);
 
-  // Non-buyer dashboards require sign in / sign up
-  const requiresRoleAuth =
-    currentRole !== 'buyer' && (!currentUser || currentUser.role !== currentRole);
+  // Unauthenticated users or users actively viewing the auth screen
+  const isAuthScreen = !currentUser || navState.subScreen === 'auth';
 
   const renderRoleScreen = () => {
-    if (requiresRoleAuth) {
-      return <AuthScreen initialRole={currentRole} />;
-    }
-    if (navState.subScreen === 'auth') {
-      return <AuthScreen initialRole={navState.authRole} initialView={navState.authView} />;
+    if (isAuthScreen) {
+      return (
+        <AuthScreen
+          initialRole={navState.authRole || currentRole}
+          initialView={navState.authView || 'login'}
+        />
+      );
     }
 
     switch (currentRole) {
@@ -43,14 +44,17 @@ const MainNavigator: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar style="dark" />
+    <SafeAreaView
+      style={[styles.safeArea, isAuthScreen && { backgroundColor: '#1B5E39' }]}
+      edges={['top', 'left', 'right']}
+    >
+      <StatusBar style={isAuthScreen ? 'light' : 'dark'} />
       <View style={styles.container}>
-        <AppHeader />
+        {!isAuthScreen && <AppHeader />}
         <View style={styles.content}>
           {renderRoleScreen()}
         </View>
-        {!isSubScreenActive && !requiresRoleAuth && <BottomNav role={currentRole} />}
+        {!isSubScreenActive && !isAuthScreen && <BottomNav role={currentRole} />}
       </View>
     </SafeAreaView>
   );

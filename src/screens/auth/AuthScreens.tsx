@@ -1,29 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import {
   Sprout,
-  ShieldCheck,
+  ShoppingBag,
   Truck,
-  Users,
-  ArrowRight,
+  User as UserIcon,
   Phone,
   Lock,
-  User as UserIcon,
+  Eye,
+  EyeOff,
+  Check,
+  CreditCard,
   MapPin,
-  Sparkles,
-  ChevronLeft,
-  AlertCircle,
+  FileText,
+  ShieldCheck,
+  Home,
+  Layers,
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
-import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Card } from '../../components/ui/Card';
 import { Role } from '../../types';
-import { GoviyaLogo } from '../../components/shared/GoviyaLogo';
+import { GoviyaMarketplaceBadge } from '../../components/shared/GoviyaMarketplaceBadge';
 
 export interface AuthScreenProps {
   initialRole?: Role;
-  initialView?: 'login' | 'register' | 'onboarding' | 'splash';
+  initialView?: 'login' | 'register';
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({
@@ -34,637 +43,1411 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     loginAsUser,
     loginAsRole,
     registerUser,
-    continueAsGuest,
     authTargetRole,
     users,
   } = useApp();
 
-  const effectiveInitialRole = initialRole || authTargetRole || 'buyer';
-
-  const [view, setView] = useState<'splash' | 'onboarding' | 'login' | 'register'>(
-    initialView === 'register' ? 'register' : 'login'
-  );
-  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [view, setView] = useState<'login' | 'register'>(initialView);
 
   // Form states
-  const [loginRole, setLoginRole] = useState<Role>(effectiveInitialRole);
-  const [phone, setPhone] = useState('+94 77 123 4567');
-  const [password, setPassword] = useState('password123');
+  const [identifier, setIdentifier] = useState(''); // phone or email
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
-  // Register Role & Fields
-  const [registerRole, setRegisterRole] = useState<'buyer' | 'farmer' | 'driver'>(
-    effectiveInitialRole === 'admin'
-      ? 'buyer'
-      : (effectiveInitialRole as 'buyer' | 'farmer' | 'driver')
-  );
-  const [name, setName] = useState('');
-  const [regPhone, setRegPhone] = useState('+94 7');
-  const [district, setDistrict] = useState('Nuwara Eliya');
-  const [address, setAddress] = useState('');
+  // Register stakeholder role: buyer | farmer | driver
+  const [registerRole, setRegisterRole] = useState<'buyer' | 'farmer' | 'driver'>(() => {
+    if (initialRole === 'driver' || authTargetRole === 'driver') return 'driver';
+    if (initialRole === 'farmer' || authTargetRole === 'farmer') return 'farmer';
+    return 'buyer';
+  });
+
+  // Common register fields
+  const [fullName, setFullName] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
+
+  // Delivery Rider specific fields
+  const [drivingLicense, setDrivingLicense] = useState('');
+  const [vehicleType, setVehicleType] = useState<
+    'Three-Wheeler' | 'Light Truck (Dimas)' | 'Motorbike' | 'Lorry'
+  >('Light Truck (Dimas)');
+  const [vehiclePlate, setVehiclePlate] = useState('');
+  const [riderDistrict, setRiderDistrict] = useState('Gampaha');
 
   // Farmer specific fields
   const [farmName, setFarmName] = useState('');
   const [nicNumber, setNicNumber] = useState('');
-  const [farmSizeAcres, setFarmSizeAcres] = useState('3.5');
-
-  // Driver specific fields
-  const [vehicleType, setVehicleType] = useState<
-    'Light Truck (Dimas)' | 'Three-Wheeler' | 'Motorbike' | 'Lorry'
-  >('Light Truck (Dimas)');
-  const [vehiclePlate, setVehiclePlate] = useState('WP - LG 8824');
-  const [driverLicenseNumber, setDriverLicenseNumber] = useState('B-84910284');
-
-  // Error / helper state
-  const [formError, setFormError] = useState<string | null>(null);
+  const [farmerDistrict, setFarmerDistrict] = useState('Nuwara Eliya');
+  const [farmSize, setFarmSize] = useState('3.5');
 
   useEffect(() => {
-    if (effectiveInitialRole) {
-      setLoginRole(effectiveInitialRole);
-      if (effectiveInitialRole !== 'admin') {
-        setRegisterRole(effectiveInitialRole as 'buyer' | 'farmer' | 'driver');
+    if (initialView) {
+      setView(initialView);
+    }
+  }, [initialView]);
+
+  useEffect(() => {
+    if (initialRole === 'driver' || authTargetRole === 'driver') {
+      setRegisterRole('driver');
+    } else if (initialRole === 'farmer' || authTargetRole === 'farmer') {
+      setRegisterRole('farmer');
+    } else if (initialRole === 'buyer' || authTargetRole === 'buyer') {
+      setRegisterRole('buyer');
+    }
+  }, [initialRole, authTargetRole]);
+
+  // Normalize phone digits to match 07X... with +94 7X...
+  const normalizeDigits = (str: string) => {
+    return str.replace(/\D/g, '').replace(/^94/, '').replace(/^0/, '');
+  };
+
+  // Handle standard Login submission
+  const handleLoginSubmit = () => {
+    const rawInput = identifier.trim();
+    const cleanId = rawInput.toLowerCase();
+    const inputDigits = normalizeDigits(rawInput);
+
+    // 1. Try matching existing registered user by phone digits, email, or name
+    if (rawInput) {
+      const matched = users.find(u => {
+        const uDigits = normalizeDigits(u.phone);
+        const phoneMatch = inputDigits.length >= 7 && uDigits.includes(inputDigits);
+        const emailMatch = u.email && u.email.toLowerCase() === cleanId;
+        const nameMatch = u.name.toLowerCase() === cleanId;
+        return phoneMatch || emailMatch || nameMatch;
+      });
+
+      if (matched) {
+        loginAsUser(matched._id);
+        return;
       }
     }
-  }, [effectiveInitialRole]);
 
-  const onboardingSlides = [
-    {
-      title: 'Direct Farm-to-Table in Sri Lanka',
-      subtitle:
-        'Eliminate middlemen brokers. Farmers get fair wholesale rates, buyers get harvest-fresh produce at lower cost.',
-      badge: 'Fair Trade Agriculture',
-      icon: <Sprout size={48} color="#1F5C3A" />,
-      color: 'bg-[#E6F2E8]',
-    },
-    {
-      title: 'Find Nearby Verified Producers',
-      subtitle:
-        'Discover local growers in Nuwara Eliya, Dambulla, Jaffna and Kandy with real-time harvest availability.',
-      badge: 'Islandwide Logistics',
-      icon: <Truck size={48} color="#2E8C9F" />,
-      color: 'bg-[#EEF8FA]',
-    },
-    {
-      title: 'Transparent Pricing & Safe Delivery',
-      subtitle:
-        'Track live wholesale benchmarks from Dambulla Economic Centre with verified drivers and direct chats.',
-      badge: 'Guaranteed Quality',
-      icon: <ShieldCheck size={48} color="#E8A317" />,
-      color: 'bg-[#FEF8EA]',
-    },
-  ];
+    // 2. Keyword check if user typed role hint
+    if (cleanId.includes('admin')) {
+      loginAsRole('admin');
+      return;
+    }
+    if (cleanId.includes('driver') || cleanId.includes('logi') || cleanId.includes('rider')) {
+      loginAsRole('driver');
+      return;
+    }
+    if (cleanId.includes('farmer')) {
+      loginAsRole('farmer');
+      return;
+    }
+    if (cleanId.includes('buyer')) {
+      loginAsRole('buyer');
+      return;
+    }
 
+    // 3. Fallback based on context
+    const targetRole: Role = initialRole || authTargetRole || 'buyer';
+    loginAsRole(targetRole);
+  };
+
+  // Handle OTP Login
+  const handleOtpLogin = () => {
+    if (!identifier.trim()) {
+      Alert.alert(
+        'Phone Number Required',
+        'Please enter your mobile number (e.g. 077 123 4567) to receive an SMS verification code.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Use Demo (+94 77 123 4567)',
+            onPress: () => {
+              setIdentifier('077 123 4567');
+              Alert.alert(
+                'Demo OTP Code: 482910',
+                'Verification successful. Navigating to your dashboard.',
+                [
+                  {
+                    text: 'Continue',
+                    onPress: () => loginAsRole('farmer'),
+                  },
+                ]
+              );
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    Alert.alert(
+      'SMS Verification Code Sent',
+      `A 6-digit one-time code was sent to ${identifier.trim()}.\n\nDemo PIN: 482910`,
+      [
+        {
+          text: 'Verify & Continue',
+          onPress: () => handleLoginSubmit(),
+        },
+      ]
+    );
+  };
+
+  // Forgot password handler
+  const handleForgotPassword = () => {
+    Alert.alert(
+      'Reset Password',
+      'Please enter your registered Sri Lankan phone number or email to receive password reset instructions.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send SMS Link',
+          onPress: () =>
+            Alert.alert(
+              'Reset Link Sent',
+              'A password reset link was sent via SMS. Please check your messages.'
+            ),
+        },
+      ]
+    );
+  };
+
+  // Handle Create Account / Register submission
   const handleRegisterSubmit = () => {
-    setFormError(null);
-
-    if (!name.trim()) {
-      setFormError('Please enter your full name');
+    if (!fullName.trim()) {
+      Alert.alert('Full Name Required', 'Please enter your full name to create an account.');
       return;
     }
 
-    if (!regPhone.trim() || regPhone.length < 9) {
-      setFormError('Please enter a valid Sri Lankan phone number');
+    if (!identifier.trim()) {
+      Alert.alert(
+        'Contact Info Required',
+        'Please enter your phone number or email address.'
+      );
       return;
     }
 
-    if (registerRole === 'farmer' && !farmName.trim()) {
-      setFormError('Please enter your farm or holding name');
+    // Role-specific validation
+    if (registerRole === 'driver') {
+      if (!drivingLicense.trim()) {
+        Alert.alert(
+          'Driving Licence Required',
+          'Please enter your Sri Lankan driving licence number to register as a delivery rider.'
+        );
+        return;
+      }
+      if (!vehiclePlate.trim()) {
+        Alert.alert(
+          'Vehicle Number Plate Required',
+          'Please enter your vehicle registration plate number (e.g. WP - LG 8824).'
+        );
+        return;
+      }
+    }
+
+    if (registerRole === 'farmer') {
+      if (!nicNumber.trim()) {
+        Alert.alert(
+          'NIC Required',
+          'Please enter your National Identity Card (NIC) number for farmer identity verification.'
+        );
+        return;
+      }
+      if (!farmName.trim()) {
+        Alert.alert(
+          'Farm Name Required',
+          'Please enter your farm or estate name (e.g. Nuwara Eliya Fresh Greens).'
+        );
+        return;
+      }
+    }
+
+    if (!agreeTerms) {
+      Alert.alert(
+        'Terms of Service',
+        'Please agree to the Terms of Service and Privacy Policy to register.'
+      );
       return;
     }
 
-    if (registerRole === 'driver' && !vehiclePlate.trim()) {
-      setFormError('Please enter your vehicle registration plate');
+    // Format phone cleanly
+    const rawContact = identifier.trim();
+    let formattedPhone = rawContact;
+    if (!rawContact.includes('@')) {
+      const digits = rawContact.replace(/\D/g, '');
+      if (digits.startsWith('94')) {
+        formattedPhone = `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+      } else if (digits.startsWith('0')) {
+        formattedPhone = `+94 ${digits.slice(1, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
+      } else {
+        formattedPhone = `+94 ${digits}`;
+      }
+    }
+
+    // 1. DELIVERY RIDER REGISTRATION
+    if (registerRole === 'driver') {
+      registerUser({
+        name: fullName.trim(),
+        phone: formattedPhone,
+        email: rawContact.includes('@') ? rawContact : undefined,
+        role: 'driver',
+        verified: true,
+        vehicleType,
+        vehiclePlate: vehiclePlate.trim().toUpperCase(),
+        rating: 5.0,
+        totalRatings: 1,
+        location: {
+          lat: riderDistrict === 'Colombo' ? 6.9271 : 7.084,
+          lng: riderDistrict === 'Colombo' ? 79.8612 : 80.0098,
+          district: riderDistrict,
+          address: `${riderDistrict} Delivery Hub & Logistics Depot`,
+        },
+      });
       return;
     }
 
+    // 2. FARMER REGISTRATION
+    if (registerRole === 'farmer') {
+      registerUser({
+        name: fullName.trim(),
+        phone: formattedPhone,
+        email: rawContact.includes('@') ? rawContact : undefined,
+        role: 'farmer',
+        verified: false, // Farmers submit documents and require admin KYC approval
+        nicNumber: nicNumber.trim(),
+        farmName: farmName.trim(),
+        farmSizeAcres: parseFloat(farmSize) || 3.0,
+        yearsFarming: 5,
+        rating: 5.0,
+        totalRatings: 1,
+        location: {
+          lat: 6.9697,
+          lng: 80.7891,
+          district: farmerDistrict,
+          town: farmerDistrict === 'Nuwara Eliya' ? 'Kandapola' : farmerDistrict,
+          address: `${farmName.trim()}, ${farmerDistrict}, Sri Lanka`,
+        },
+      });
+      return;
+    }
+
+    // 3. BUYER REGISTRATION (Name, Phone/Email, Password)
     registerUser({
-      name,
-      phone: regPhone,
-      role: registerRole,
-      nicNumber: registerRole === 'farmer' || registerRole === 'driver' ? nicNumber || driverLicenseNumber : undefined,
-      farmName: registerRole === 'farmer' ? farmName : undefined,
-      farmSizeAcres: registerRole === 'farmer' ? parseFloat(farmSizeAcres) || 2 : undefined,
-      vehicleType: registerRole === 'driver' ? vehicleType : undefined,
-      vehiclePlate: registerRole === 'driver' ? vehiclePlate : undefined,
-      verified: registerRole === 'buyer',
+      name: fullName.trim(),
+      phone: formattedPhone,
+      email: rawContact.includes('@') ? rawContact : undefined,
+      role: 'buyer',
+      verified: true,
+      rating: 5.0,
+      totalRatings: 1,
       location: {
-        lat: district === 'Nuwara Eliya' ? 6.9697 : district === 'Jaffna' ? 9.6615 : 6.9271,
-        lng: district === 'Nuwara Eliya' ? 80.7891 : district === 'Jaffna' ? 80.0255 : 79.8612,
-        district,
-        address: address.trim() || `${district}, Sri Lanka`,
+        lat: 6.9271,
+        lng: 79.8612,
+        district: 'Colombo',
+        town: 'Colombo 03',
+        address: 'Colombo, Western Province',
       },
     });
   };
 
-  const handleLoginSubmit = () => {
-    setFormError(null);
-    const matched = users.find(u => u.role === loginRole) || null;
-    if (matched) {
-      loginAsUser(matched._id);
-    } else {
-      loginAsRole(loginRole);
-    }
-  };
+  const vehicleOptions: ('Three-Wheeler' | 'Light Truck (Dimas)' | 'Motorbike' | 'Lorry')[] = [
+    'Motorbike',
+    'Three-Wheeler',
+    'Light Truck (Dimas)',
+    'Lorry',
+  ];
 
-  if (view === 'splash') {
-    return (
-      <View className="flex-1 justify-between bg-[#1F5C3A] p-6 text-center">
-        <View className="flex-row justify-between items-center w-full pt-4">
-          <Pressable
-            onPress={continueAsGuest}
-            className="flex-row items-center gap-1"
-          >
-            <ChevronLeft size={16} color="#ffffff" />
-            <Text className="text-xs font-semibold text-white">Browse as Guest</Text>
-          </Pressable>
-          <Pressable onPress={() => setView('login')}>
-            <Text className="text-xs font-semibold text-white">Sign In</Text>
-          </Pressable>
-        </View>
-
-        <View className="items-center my-auto">
-          <GoviyaLogo size="2xl" variant="white" />
-          <Text className="text-3xl font-extrabold text-white mt-4">Goviya</Text>
-          <Text className="text-sm text-white/85 mt-2 text-center max-w-xs">
-            Sri Lanka’s Direct Farm-to-Buyer Mobile Marketplace
-          </Text>
-        </View>
-
-        <View className="w-full pb-6" style={{ gap: 12 }}>
-          <Button
-            variant="secondary"
-            fullWidth
-            size="lg"
-            onPress={() => setView('onboarding')}
-          >
-            Get Started
-          </Button>
-          <Pressable
-            onPress={() => setView('login')}
-            className="w-full py-2.5 items-center"
-          >
-            <Text className="text-xs text-white/90 font-semibold">Already have an account? Sign In</Text>
-          </Pressable>
-          <Pressable
-            onPress={continueAsGuest}
-            className="w-full py-2 items-center"
-          >
-            <Text className="text-xs text-white/70">Explore marketplace as guest buyer →</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  if (view === 'onboarding') {
-    const current = onboardingSlides[onboardingStep];
-    return (
-      <View className="flex-1 justify-between bg-white p-6">
-        <View className="flex-row items-center justify-between w-full pt-4">
-          <Text className="text-xs font-bold text-[#1F5C3A]">{current.badge}</Text>
-          <Pressable onPress={continueAsGuest}>
-            <Text className="text-xs font-semibold text-[#6B7280]">Browse Marketplace</Text>
-          </Pressable>
-        </View>
-
-        <View className="items-center my-auto px-4">
-          <View
-            className={`w-24 h-24 rounded-3xl ${current.color} items-center justify-center mb-6`}
-          >
-            {current.icon}
-          </View>
-          <Text className="text-2xl font-bold text-[#1A1A1A] text-center mb-3">
-            {current.title}
-          </Text>
-          <Text className="text-sm text-[#6B7280] text-center leading-relaxed max-w-xs">
-            {current.subtitle}
-          </Text>
-        </View>
-
-        <View className="pb-6" style={{ gap: 16 }}>
-          <View className="flex-row justify-center gap-1.5 mb-2">
-            {onboardingSlides.map((_, i) => (
-              <View
-                key={i}
-                className={`h-1.5 rounded-full ${
-                  onboardingStep === i ? 'w-6 bg-[#1F5C3A]' : 'w-1.5 bg-[#E5E5E5]'
-                }`}
-              />
-            ))}
-          </View>
-
-          <View className="flex-row gap-3">
-            {onboardingStep > 0 && (
-              <Button
-                variant="outline"
-                style={{ flex: 1 }}
-                size="md"
-                onPress={() => setOnboardingStep(prev => prev - 1)}
-              >
-                Back
-              </Button>
-            )}
-            <Button
-              variant="primary"
-              style={{ flex: 1 }}
-              size="md"
-              rightIcon={<ArrowRight size={16} color="#ffffff" />}
-              onPress={() => {
-                if (onboardingStep < onboardingSlides.length - 1) {
-                  setOnboardingStep(prev => prev + 1);
-                } else {
-                  setView('login');
-                }
-              }}
-            >
-              {onboardingStep === onboardingSlides.length - 1 ? 'Start Now' : 'Continue'}
-            </Button>
-          </View>
-
-          <Pressable onPress={continueAsGuest} className="items-center mt-1">
-            <Text className="text-xs text-[#1F5C3A] font-semibold">
-              Skip & browse marketplace as guest
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
+  const districtOptions = ['Colombo', 'Gampaha', 'Kandy', 'Nuwara Eliya', 'Matale', 'Jaffna', 'Kurunegala'];
 
   return (
-    <ScrollView className="flex-1 bg-[#F6F7F5] px-4 py-6" contentContainerStyle={{ paddingBottom: 40 }}>
-      <View className="max-w-md w-full mx-auto" style={{ gap: 16 }}>
-        {/* Top Guest Navigation Header Bar */}
-        <View className="flex-row items-center justify-between pb-1">
-          <Pressable
-            onPress={continueAsGuest}
-            className="flex-row items-center gap-1 bg-white px-3 py-1.5 rounded-xl border border-[#D5EAD8]"
-          >
-            <ChevronLeft size={16} color="#1F5C3A" />
-            <Text className="text-xs font-bold text-[#1F5C3A]">Browse as Guest Buyer</Text>
-          </Pressable>
-          <Text className="text-[11px] font-semibold text-[#6B7280]">
-            No signup needed to browse
-          </Text>
-        </View>
-
-        {/* Brand Banner */}
-        <View className="items-center pt-1">
-          <GoviyaLogo size="lg" />
-          <Text className="text-2xl font-extrabold text-[#1A1A1A] mt-2">Goviya</Text>
-          <Text className="text-xs text-[#6B7280] text-center">
-            Connecting Sri Lankan Farmers Directly With Buyers & Logistics
-          </Text>
-        </View>
-
-        {/* Role-Gate Explanation Banner */}
-        {(effectiveInitialRole === 'farmer' || authTargetRole === 'farmer') && (
-          <View className="bg-[#FEF8EA] border border-[#FDE6B8] p-3 rounded-2xl flex-row items-start gap-2.5">
-            <Sprout size={20} color="#B45309" />
-            <View className="flex-1">
-              <Text className="font-bold text-xs text-[#92400E]">Farmer Producer Portal Access</Text>
-              <Text className="text-[11px] text-[#A16207] mt-0.5">
-                The farmer dashboard requires an authenticated producer account to manage crop harvest listings, update preparation notes, and hand over orders.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {(effectiveInitialRole === 'driver' || authTargetRole === 'driver') && (
-          <View className="bg-[#EEF8FA] border border-[#D0EEF5] p-3 rounded-2xl flex-row items-start gap-2.5">
-            <Truck size={20} color="#19768A" />
-            <View className="flex-1">
-              <Text className="font-bold text-xs text-[#0E7490]">Logistics Driver Fleet Portal Access</Text>
-              <Text className="text-[11px] text-[#155E75] mt-0.5">
-                Fleet drivers must sign up or log in with verified vehicle credentials to view ready farm orders, accept dispatch routes, and record delivery handovers.
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* 1-Click Instant Persona Sign-In for Easy Testing */}
-        <Card variant="mint" padding="md" className="border border-[#CDE5D2]">
-          <View className="flex-row items-center justify-between mb-2">
-            <View className="flex-row items-center gap-1.5">
-              <Sparkles size={14} color="#1F5C3A" />
-              <Text className="text-xs font-bold text-[#1F5C3A] uppercase">
-                1-Tap Instant Stakeholder Demo
-              </Text>
-            </View>
-            <Text className="text-[10px] text-[#4B6B56] font-medium">Quick switch</Text>
-          </View>
-
-          <View className="flex-row flex-wrap gap-2">
-            <Pressable
-              onPress={() => loginAsRole('buyer')}
-              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
-              className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-            >
-              <Text className="text-base">🛒</Text>
-              <View className="flex-1">
-                <Text className="text-xs font-bold text-[#1A1A1A]">Buyer</Text>
-                <Text className="text-[10px] text-[#6B7280]">Dinesh · Colombo</Text>
-              </View>
-            </Pressable>
-
-            <Pressable
-              onPress={() => loginAsRole('farmer')}
-              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
-              className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-            >
-              <Text className="text-base">🌱</Text>
-              <View className="flex-1">
-                <Text className="text-xs font-bold text-[#1A1A1A]">Farmer</Text>
-                <Text className="text-[10px] text-[#6B7280]">Sunil · Nuwara Eliya</Text>
-              </View>
-            </Pressable>
-
-            <Pressable
-              onPress={() => loginAsRole('driver')}
-              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
-              className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-            >
-              <Text className="text-base">🚚</Text>
-              <View className="flex-1">
-                <Text className="text-xs font-bold text-[#1A1A1A]">Driver</Text>
-                <Text className="text-[10px] text-[#6B7280]">Roshan · Dimas Truck</Text>
-              </View>
-            </Pressable>
-
-            <Pressable
-              onPress={() => loginAsRole('admin')}
-              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
-              className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-            >
-              <Text className="text-base">🛡️</Text>
-              <View className="flex-1">
-                <Text className="text-xs font-bold text-[#1A1A1A]">Admin</Text>
-                <Text className="text-[10px] text-[#6B7280]">Dr. Niluka · Center</Text>
-              </View>
-            </Pressable>
-          </View>
-        </Card>
-
-        {/* Tab Toggle: Sign In vs Create Account */}
-        <View className="flex-row p-1 bg-[#E8ECE6] rounded-2xl border border-[#D8DFD5]">
-          <Pressable
-            onPress={() => {
-              setView('login');
-              setFormError(null);
-            }}
-            className={`flex-1 py-2.5 rounded-xl items-center ${
-              view === 'login' ? 'bg-white' : ''
-            }`}
-          >
-            <Text className={`text-xs font-bold ${view === 'login' ? 'text-[#1F5C3A]' : 'text-[#6B7280]'}`}>
-              Sign In
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              setView('register');
-              setFormError(null);
-            }}
-            className={`flex-1 py-2.5 rounded-xl items-center ${
-              view === 'register' ? 'bg-[#1F5C3A]' : ''
-            }`}
-          >
-            <Text className={`text-xs font-bold ${view === 'register' ? 'text-white' : 'text-[#6B7280]'}`}>
-              Create New Account
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Error Notice */}
-        {Boolean(formError) && (
-          <View className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl flex-row items-center gap-2">
-            <AlertCircle size={16} color="#DC2626" />
-            <Text className="text-xs text-[#DC2626] flex-1">{formError}</Text>
-          </View>
-        )}
-
-        {/* Regular Sign-In / Register Form Card */}
-        <Card variant="default" padding="lg">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: '#F6F7F5' }}
+    >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+      >
+        {/* ==================== 1. TOP FOREST GREEN HEADER ==================== */}
+        <View
+          style={{
+            backgroundColor: '#1B5E39',
+            paddingTop: 24,
+            paddingBottom: 44,
+            paddingHorizontal: 20,
+            alignItems: 'center',
+          }}
+        >
           {view === 'login' ? (
-            <View style={{ gap: 16 }}>
-              <View>
-                <Text className="text-base font-bold text-[#1A1A1A]">Account Sign In</Text>
-                <Text className="text-xs text-[#6B7280] mt-0.5">
-                  Sign in to access your customized role dashboard:
-                </Text>
-              </View>
-
-              {/* Login Role Selector */}
-              <View>
-                <Text className="text-xs font-semibold text-[#1A1A1A] mb-1.5 uppercase tracking-wider">
-                  Select Role to Sign In
-                </Text>
-                <View className="flex-row gap-2">
-                  <Pressable
-                    onPress={() => setLoginRole('buyer')}
-                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-                    className={`flex-1 py-2.5 min-h-[50px] justify-center rounded-xl border items-center ${
-                      loginRole === 'buyer' ? 'border-[#1F5C3A] bg-[#E6F2E8]' : 'border-[#E5E5E5] bg-white'
-                    }`}
-                  >
-                    <Text className="text-base">🛒</Text>
-                    <Text className="text-[11px] font-bold text-[#1F5C3A] mt-0.5">Buyer</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setLoginRole('farmer')}
-                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-                    className={`flex-1 py-2.5 min-h-[50px] justify-center rounded-xl border items-center ${
-                      loginRole === 'farmer' ? 'border-[#B45309] bg-[#FEF8EA]' : 'border-[#E5E5E5] bg-white'
-                    }`}
-                  >
-                    <Text className="text-base">🌱</Text>
-                    <Text className="text-[11px] font-bold text-[#B45309] mt-0.5">Farmer</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setLoginRole('driver')}
-                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-                    className={`flex-1 py-2.5 min-h-[50px] justify-center rounded-xl border items-center ${
-                      loginRole === 'driver' ? 'border-[#19768A] bg-[#EEF8FA]' : 'border-[#E5E5E5] bg-white'
-                    }`}
-                  >
-                    <Text className="text-base">🚚</Text>
-                    <Text className="text-[11px] font-bold text-[#19768A] mt-0.5">Driver</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <Input
-                label="Registered Mobile Phone Number"
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                leftIcon={<Phone size={16} color="#6B7280" />}
-                placeholder="+94 7X XXX XXXX"
-              />
-
-              <Input
-                label="Password / OTP"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-                leftIcon={<Lock size={16} color="#6B7280" />}
-                placeholder="Enter password"
-              />
-
-              <Button
-                variant="primary"
-                fullWidth
-                size="lg"
-                onPress={handleLoginSubmit}
+            /* Login Header: Circular Badge + Welcome back! */
+            <View style={{ alignItems: 'center' }}>
+              <GoviyaMarketplaceBadge shape="circle" size={78} />
+              <Text
+                style={{
+                  fontSize: 27,
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                  marginTop: 14,
+                  textAlign: 'center',
+                  letterSpacing: -0.3,
+                }}
               >
-                {`Sign In as ${loginRole === 'buyer' ? 'Buyer' : loginRole === 'farmer' ? 'Farmer' : 'Logistics Driver'}`}
-              </Button>
-
-              <View className="pt-2 items-center" style={{ gap: 8 }}>
-                <Pressable onPress={() => setView('register')}>
-                  <Text className="text-xs text-[#1F5C3A] font-semibold text-center">
-                    New to Goviya? Create account as Buyer, Farmer or Driver
-                  </Text>
-                </Pressable>
-                <Pressable onPress={continueAsGuest}>
-                  <Text className="text-xs text-[#6B7280] text-center mt-1">
-                    Or continue browsing produce marketplace without sign in
-                  </Text>
-                </Pressable>
-              </View>
+                Welcome back!
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  marginTop: 6,
+                  textAlign: 'center',
+                }}
+              >
+                Sign in to continue growing with us
+              </Text>
             </View>
           ) : (
-            <View style={{ gap: 16 }}>
-              <View>
-                <Text className="text-base font-bold text-[#1A1A1A]">Register New Account</Text>
-                <Text className="text-xs text-[#6B7280] mt-0.5">
-                  Choose your role to get specialized features:
-                </Text>
-              </View>
-
-              {/* 3-Role Selector */}
-              <View>
-                <Text className="text-xs font-semibold text-[#1A1A1A] mb-1.5 uppercase tracking-wider">
-                  Select Your Account Role
-                </Text>
-                <View className="flex-row gap-2">
-                  <Pressable
-                    onPress={() => setRegisterRole('buyer')}
-                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-                    className={`flex-1 p-2.5 min-h-[54px] justify-center rounded-xl border items-center ${
-                      registerRole === 'buyer' ? 'border-[#1F5C3A] bg-[#E6F2E8]' : 'border-[#E5E5E5] bg-white'
-                    }`}
-                  >
-                    <Users size={20} color="#1F5C3A" />
-                    <Text className="text-[11px] font-bold text-[#1F5C3A] mt-1">Buyer</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setRegisterRole('farmer')}
-                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-                    className={`flex-1 p-2.5 min-h-[54px] justify-center rounded-xl border items-center ${
-                      registerRole === 'farmer' ? 'border-[#B45309] bg-[#FEF8EA]' : 'border-[#E5E5E5] bg-white'
-                    }`}
-                  >
-                    <Sprout size={20} color="#B45309" />
-                    <Text className="text-[11px] font-bold text-[#B45309] mt-1">Farmer</Text>
-                  </Pressable>
-
-                  <Pressable
-                    onPress={() => setRegisterRole('driver')}
-                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
-                    className={`flex-1 p-2.5 min-h-[54px] justify-center rounded-xl border items-center ${
-                      registerRole === 'driver' ? 'border-[#19768A] bg-[#EEF8FA]' : 'border-[#E5E5E5] bg-white'
-                    }`}
-                  >
-                    <Truck size={20} color="#19768A" />
-                    <Text className="text-[11px] font-bold text-[#19768A] mt-1">Driver</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <Input
-                label="Full Name"
-                value={name}
-                onChangeText={setName}
-                leftIcon={<UserIcon size={16} color="#6B7280" />}
-                placeholder="e.g. Bandara Jayasinghe"
-              />
-
-              <Input
-                label="Mobile Phone (+94)"
-                keyboardType="phone-pad"
-                value={regPhone}
-                onChangeText={setRegPhone}
-                leftIcon={<Phone size={16} color="#6B7280" />}
-                placeholder="+94 77 XXX XXXX"
-              />
-
-              {registerRole === 'farmer' && (
-                <View className="p-3 bg-[#FEF8EA] rounded-xl border border-[#FDE6B8]" style={{ gap: 12 }}>
-                  <Text className="text-[11px] font-bold text-[#B45309] uppercase">
-                    Producer Farm Details
-                  </Text>
-                  <Input
-                    label="Farm / Holding Name"
-                    value={farmName}
-                    onChangeText={setFarmName}
-                    placeholder="e.g. Kandapola Highland Eco Farm"
-                  />
-                  <Input
-                    label="Farm Size (in Acres)"
-                    keyboardType="numeric"
-                    value={farmSizeAcres}
-                    onChangeText={setFarmSizeAcres}
-                    placeholder="e.g. 4.5"
-                  />
-                </View>
-              )}
-
-              {registerRole === 'driver' && (
-                <View className="p-3 bg-[#EEF8FA] rounded-xl border border-[#D0EEF5]" style={{ gap: 12 }}>
-                  <Text className="text-[11px] font-bold text-[#19768A] uppercase">
-                    Fleet Vehicle Details
-                  </Text>
-                  <Input
-                    label="Vehicle License Plate Number"
-                    value={vehiclePlate}
-                    onChangeText={setVehiclePlate}
-                    placeholder="e.g. WP - LG 8824"
-                  />
-                </View>
-              )}
-
-              {registerRole === 'buyer' && (
-                <Input
-                  label="Delivery / Receiving Address"
-                  value={address}
-                  onChangeText={setAddress}
-                  placeholder="e.g. No. 42/3, Havelock Road, Colombo 05"
-                />
-              )}
-
-              <Button
-                variant="primary"
-                fullWidth
-                size="lg"
-                onPress={handleRegisterSubmit}
+            /* Sign Up Header: Square Badge + Goviya Title + Create your account */
+            <View style={{ alignItems: 'center' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                {`Register as ${registerRole === 'farmer' ? 'Farmer' : registerRole === 'driver' ? 'Logistics Driver' : 'Buyer'}`}
-              </Button>
-
-              <View className="pt-1 items-center" style={{ gap: 6 }}>
-                <Pressable onPress={() => setView('login')}>
-                  <Text className="text-xs text-[#1F5C3A] font-semibold text-center">
-                    Already registered? Back to Sign In
-                  </Text>
-                </Pressable>
+                <GoviyaMarketplaceBadge shape="square" size={62} />
+                <Text
+                  style={{
+                    fontSize: 32,
+                    fontWeight: '900',
+                    color: '#FFFFFF',
+                    marginLeft: 12,
+                    letterSpacing: -0.5,
+                  }}
+                >
+                  Goviya
+                </Text>
               </View>
+
+              <Text
+                style={{
+                  fontSize: 25,
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                  marginTop: 16,
+                  textAlign: 'center',
+                  letterSpacing: -0.3,
+                }}
+              >
+                Create your account
+              </Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  marginTop: 5,
+                  textAlign: 'center',
+                }}
+              >
+                {registerRole === 'driver'
+                  ? 'Join our logistics fleet as a delivery rider'
+                  : registerRole === 'farmer'
+                  ? 'Sell directly from your farm to verified buyers'
+                  : 'Start buying fresh harvests directly from growers'}
+              </Text>
             </View>
           )}
-        </Card>
-      </View>
-    </ScrollView>
+        </View>
+
+        {/* ==================== 2. MAIN WHITE FLOATING CARD ==================== */}
+        <View
+          style={{
+            marginTop: -24,
+            marginHorizontal: 16,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 24,
+            padding: 22,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.08,
+            shadowRadius: 16,
+            elevation: 4,
+          }}
+        >
+          {view === 'login' ? (
+            /* ------------------ LOGIN FORM ------------------ */
+            <View style={{ gap: 15 }}>
+              {/* Field: Phone Number / Email */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 8,
+                  }}
+                >
+                  Phone Number / Email
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    height: 52,
+                    backgroundColor: '#FFFFFF',
+                    gap: 10,
+                  }}
+                >
+                  <UserIcon size={19} color="#9CA3AF" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13.5,
+                      color: '#1A1A1A',
+                      padding: 0,
+                    }}
+                    placeholder="Enter your phone number or email"
+                    placeholderTextColor="#9CA3AF"
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* Field: Password */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 8,
+                  }}
+                >
+                  Password
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    height: 52,
+                    backgroundColor: '#FFFFFF',
+                    gap: 10,
+                  }}
+                >
+                  <Lock size={19} color="#9CA3AF" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13.5,
+                      color: '#1A1A1A',
+                      padding: 0,
+                    }}
+                    placeholder="Enter your password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={8}
+                    style={{ padding: 4 }}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={19} color="#6B7280" />
+                    ) : (
+                      <Eye size={19} color="#6B7280" />
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Forgot password? Link */}
+              <Pressable
+                onPress={handleForgotPassword}
+                style={{ alignSelf: 'flex-end', marginTop: -2, marginBottom: 4 }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '700',
+                    color: '#1B5E39',
+                  }}
+                >
+                  Forgot password?
+                </Text>
+              </Pressable>
+
+              {/* Primary Log In Button */}
+              <Pressable
+                onPress={handleLoginSubmit}
+                style={({ pressed }) => [
+                  {
+                    height: 50,
+                    backgroundColor: '#1B5E39',
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 6,
+                  },
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  Log In
+                </Text>
+              </Pressable>
+
+              {/* Secondary Log in with OTP Button */}
+              <Pressable
+                onPress={handleOtpLogin}
+                style={({ pressed }) => [
+                  {
+                    height: 50,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1.5,
+                    borderColor: '#1B5E39',
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  },
+                  pressed && { opacity: 0.85, backgroundColor: '#F8FAF8' },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: '#1B5E39',
+                  }}
+                >
+                  Log in with OTP
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            /* ------------------ REGISTER FORM ------------------ */
+            <View style={{ gap: 14 }}>
+              {/* Section: I want to join as (Buyer | Farmer | Delivery Rider) */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 10,
+                  }}
+                >
+                  I want to join as
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {/* Buyer Option */}
+                  <Pressable
+                    onPress={() => setRegisterRole('buyer')}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderRadius: 13,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor:
+                        registerRole === 'buyer' ? '#EAF4ED' : '#FFFFFF',
+                      borderWidth: registerRole === 'buyer' ? 2 : 1,
+                      borderColor:
+                        registerRole === 'buyer' ? '#1B5E39' : '#E5E7EB',
+                    }}
+                  >
+                    <ShoppingBag
+                      size={16}
+                      color={registerRole === 'buyer' ? '#1B5E39' : '#4B5563'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '700',
+                        color:
+                          registerRole === 'buyer' ? '#1B5E39' : '#4B5563',
+                      }}
+                    >
+                      Buyer
+                    </Text>
+                  </Pressable>
+
+                  {/* Farmer Option */}
+                  <Pressable
+                    onPress={() => setRegisterRole('farmer')}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderRadius: 13,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor:
+                        registerRole === 'farmer' ? '#EAF4ED' : '#FFFFFF',
+                      borderWidth: registerRole === 'farmer' ? 2 : 1,
+                      borderColor:
+                        registerRole === 'farmer' ? '#1B5E39' : '#E5E7EB',
+                    }}
+                  >
+                    <Sprout
+                      size={16}
+                      color={registerRole === 'farmer' ? '#1B5E39' : '#4B5563'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '700',
+                        color:
+                          registerRole === 'farmer' ? '#1B5E39' : '#4B5563',
+                      }}
+                    >
+                      Farmer
+                    </Text>
+                  </Pressable>
+
+                  {/* Delivery Rider Option */}
+                  <Pressable
+                    onPress={() => setRegisterRole('driver')}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderRadius: 13,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor:
+                        registerRole === 'driver' ? '#EAF4ED' : '#FFFFFF',
+                      borderWidth: registerRole === 'driver' ? 2 : 1,
+                      borderColor:
+                        registerRole === 'driver' ? '#1B5E39' : '#E5E7EB',
+                    }}
+                  >
+                    <Truck
+                      size={16}
+                      color={registerRole === 'driver' ? '#1B5E39' : '#4B5563'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '700',
+                        color:
+                          registerRole === 'driver' ? '#1B5E39' : '#4B5563',
+                      }}
+                    >
+                      Rider
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Field: Full Name */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 7,
+                  }}
+                >
+                  Full Name
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    height: 50,
+                    backgroundColor: '#FFFFFF',
+                    gap: 10,
+                  }}
+                >
+                  <UserIcon size={18} color="#9CA3AF" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13.5,
+                      color: '#1A1A1A',
+                      padding: 0,
+                    }}
+                    placeholder={
+                      registerRole === 'driver'
+                        ? 'Enter delivery rider full name'
+                        : registerRole === 'farmer'
+                        ? 'Enter farmer full name'
+                        : 'Enter your full name'
+                    }
+                    placeholderTextColor="#9CA3AF"
+                    value={fullName}
+                    onChangeText={setFullName}
+                  />
+                </View>
+              </View>
+
+              {/* Field: Phone Number / Email */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 7,
+                  }}
+                >
+                  Phone Number / Email
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    height: 50,
+                    backgroundColor: '#FFFFFF',
+                    gap: 10,
+                  }}
+                >
+                  <Phone size={18} color="#9CA3AF" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13.5,
+                      color: '#1A1A1A',
+                      padding: 0,
+                    }}
+                    placeholder="Enter your phone number or email"
+                    placeholderTextColor="#9CA3AF"
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              {/* Field: Password */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 7,
+                  }}
+                >
+                  Password
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    height: 50,
+                    backgroundColor: '#FFFFFF',
+                    gap: 10,
+                  }}
+                >
+                  <Lock size={18} color="#9CA3AF" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13.5,
+                      color: '#1A1A1A',
+                      padding: 0,
+                    }}
+                    placeholder="Create a password"
+                    placeholderTextColor="#9CA3AF"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword(!showPassword)}
+                    hitSlop={8}
+                    style={{ padding: 4 }}
+                  >
+                    {showPassword ? (
+                      <EyeOff size={18} color="#6B7280" />
+                    ) : (
+                      <Eye size={18} color="#6B7280" />
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* ================= STAKEHOLDER SPECIFIC FIELDS ================= */}
+
+              {/* A. DELIVERY RIDER ADDITIONAL FIELDS */}
+              {registerRole === 'driver' && (
+                <View
+                  style={{
+                    backgroundColor: '#F8FAF8',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 16,
+                    padding: 14,
+                    gap: 12,
+                    marginTop: 2,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <ShieldCheck size={16} color="#1B5E39" />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#1B5E39' }}>
+                      Rider & Fleet Verification
+                    </Text>
+                  </View>
+
+                  {/* Driving Licence Number */}
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                      Driving Licence Number
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: '#D1D5DB',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        height: 46,
+                        backgroundColor: '#FFFFFF',
+                        gap: 8,
+                      }}
+                    >
+                      <CreditCard size={17} color="#9CA3AF" />
+                      <TextInput
+                        style={{ flex: 1, fontSize: 13, color: '#1A1A1A', padding: 0 }}
+                        placeholder="e.g. B-84910284"
+                        placeholderTextColor="#9CA3AF"
+                        value={drivingLicense}
+                        onChangeText={setDrivingLicense}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Vehicle Type Picker */}
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                      Vehicle Type
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {vehicleOptions.map(vt => {
+                        const isSelected = vehicleType === vt;
+                        return (
+                          <Pressable
+                            key={vt}
+                            onPress={() => setVehicleType(vt)}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              borderRadius: 10,
+                              borderWidth: isSelected ? 1.5 : 1,
+                              borderColor: isSelected ? '#1B5E39' : '#D1D5DB',
+                              backgroundColor: isSelected ? '#EAF4ED' : '#FFFFFF',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: isSelected ? '700' : '500',
+                                color: isSelected ? '#1B5E39' : '#4B5563',
+                              }}
+                            >
+                              {vt === 'Three-Wheeler' ? '🛺 Three-Wheeler' : vt === 'Light Truck (Dimas)' ? '🚚 Dimas Truck' : vt === 'Motorbike' ? '🏍️ Motorbike' : '🚛 Lorry'}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Vehicle Number Plate */}
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                      Vehicle Number Plate
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: '#D1D5DB',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        height: 46,
+                        backgroundColor: '#FFFFFF',
+                        gap: 8,
+                      }}
+                    >
+                      <FileText size={17} color="#9CA3AF" />
+                      <TextInput
+                        style={{ flex: 1, fontSize: 13, color: '#1A1A1A', padding: 0 }}
+                        placeholder="e.g. WP - LG 8824"
+                        placeholderTextColor="#9CA3AF"
+                        value={vehiclePlate}
+                        onChangeText={setVehiclePlate}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Delivery Operating Hub */}
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                      Operating District / Hub
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {districtOptions.slice(0, 5).map(dist => {
+                        const isSelected = riderDistrict === dist;
+                        return (
+                          <Pressable
+                            key={dist}
+                            onPress={() => setRiderDistrict(dist)}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#1B5E39' : '#E5E7EB',
+                              backgroundColor: isSelected ? '#1B5E39' : '#FFFFFF',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: isSelected ? '700' : '500',
+                                color: isSelected ? '#FFFFFF' : '#4B5563',
+                              }}
+                            >
+                              {dist}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* B. FARMER ADDITIONAL FIELDS */}
+              {registerRole === 'farmer' && (
+                <View
+                  style={{
+                    backgroundColor: '#F8FAF8',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 16,
+                    padding: 14,
+                    gap: 12,
+                    marginTop: 2,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <Sprout size={16} color="#1B5E39" />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#1B5E39' }}>
+                      Farm Holding & KYC Details
+                    </Text>
+                  </View>
+
+                  {/* Farm Name */}
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                      Farm / Estate Name
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: '#D1D5DB',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        height: 46,
+                        backgroundColor: '#FFFFFF',
+                        gap: 8,
+                      }}
+                    >
+                      <Home size={17} color="#9CA3AF" />
+                      <TextInput
+                        style={{ flex: 1, fontSize: 13, color: '#1A1A1A', padding: 0 }}
+                        placeholder="e.g. Nuwara Eliya Fresh Greens"
+                        placeholderTextColor="#9CA3AF"
+                        value={farmName}
+                        onChangeText={setFarmName}
+                      />
+                    </View>
+                  </View>
+
+                  {/* NIC Number */}
+                  <View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                      National Identity Card (NIC)
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        borderWidth: 1,
+                        borderColor: '#D1D5DB',
+                        borderRadius: 12,
+                        paddingHorizontal: 12,
+                        height: 46,
+                        backgroundColor: '#FFFFFF',
+                        gap: 8,
+                      }}
+                    >
+                      <CreditCard size={17} color="#9CA3AF" />
+                      <TextInput
+                        style={{ flex: 1, fontSize: 13, color: '#1A1A1A', padding: 0 }}
+                        placeholder="e.g. 198567204918 or 856720491V"
+                        placeholderTextColor="#9CA3AF"
+                        value={nicNumber}
+                        onChangeText={setNicNumber}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Farm District & Size in 2 columns */}
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                        Farm District
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          borderWidth: 1,
+                          borderColor: '#D1D5DB',
+                          borderRadius: 12,
+                          paddingHorizontal: 10,
+                          height: 46,
+                          backgroundColor: '#FFFFFF',
+                          gap: 6,
+                        }}
+                      >
+                        <MapPin size={16} color="#9CA3AF" />
+                        <TextInput
+                          style={{ flex: 1, fontSize: 12.5, color: '#1A1A1A', padding: 0 }}
+                          placeholder="e.g. Nuwara Eliya"
+                          placeholderTextColor="#9CA3AF"
+                          value={farmerDistrict}
+                          onChangeText={setFarmerDistrict}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#374151', marginBottom: 6 }}>
+                        Farm Size (Acres)
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          borderWidth: 1,
+                          borderColor: '#D1D5DB',
+                          borderRadius: 12,
+                          paddingHorizontal: 10,
+                          height: 46,
+                          backgroundColor: '#FFFFFF',
+                          gap: 6,
+                        }}
+                      >
+                        <Layers size={16} color="#9CA3AF" />
+                        <TextInput
+                          style={{ flex: 1, fontSize: 12.5, color: '#1A1A1A', padding: 0 }}
+                          placeholder="e.g. 3.5"
+                          placeholderTextColor="#9CA3AF"
+                          value={farmSize}
+                          onChangeText={setFarmSize}
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Checkbox: Terms of Service & Privacy Policy */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 10,
+                  marginTop: 4,
+                }}
+              >
+                <Pressable
+                  onPress={() => setAgreeTerms(!agreeTerms)}
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    borderWidth: 1.5,
+                    borderColor: agreeTerms ? '#1B5E39' : '#D1D5DB',
+                    backgroundColor: agreeTerms ? '#1B5E39' : '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {agreeTerms && (
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                  )}
+                </Pressable>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#4B5563',
+                    flex: 1,
+                    lineHeight: 18,
+                  }}
+                >
+                  I agree to the{' '}
+                  <Text style={{ fontWeight: '700', color: '#1B5E39' }}>
+                    Terms of Service
+                  </Text>{' '}
+                  and{' '}
+                  <Text style={{ fontWeight: '700', color: '#1B5E39' }}>
+                    Privacy Policy
+                  </Text>
+                </Text>
+              </View>
+
+              {/* Primary Create Account Button */}
+              <Pressable
+                onPress={handleRegisterSubmit}
+                style={({ pressed }) => [
+                  {
+                    height: 50,
+                    backgroundColor: '#1B5E39',
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 8,
+                  },
+                  pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {registerRole === 'driver'
+                    ? 'Register as Delivery Rider'
+                    : registerRole === 'farmer'
+                    ? 'Register as Farmer'
+                    : 'Create Buyer Account'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        {/* ==================== 3. FOOTER ACTIONS & NAVIGATION ==================== */}
+        {view === 'login' ? (
+          /* Login Footer with Register Link + Direct Role Navigation */
+          <View style={{ paddingHorizontal: 16, paddingTop: 18, gap: 10 }}>
+            {/* Don't have an account? Register */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 6,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: '#6B7280' }}>
+                Don't have an account?{' '}
+              </Text>
+              <Pressable onPress={() => setView('register')}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1B5E39',
+                  }}
+                >
+                  Register
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Quick 2-Column Role Cards: Farmer & Buyer */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => loginAsRole('farmer')}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    height: 48,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  },
+                  pressed && { opacity: 0.85, backgroundColor: '#F8FAF8' },
+                ]}
+              >
+                <Sprout size={18} color="#1B5E39" />
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                  }}
+                >
+                  Farmer
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => loginAsRole('buyer')}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    height: 48,
+                    backgroundColor: '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  },
+                  pressed && { opacity: 0.85, backgroundColor: '#F8FAF8' },
+                ]}
+              >
+                <ShoppingBag size={18} color="#1B5E39" />
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                  }}
+                >
+                  Buyer
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Login as Admin Button */}
+            <Pressable
+              onPress={() => loginAsRole('admin')}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  backgroundColor: '#EAF4ED',
+                  borderRadius: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  marginTop: 2,
+                },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <UserIcon size={18} color="#1B5E39" />
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: '700',
+                  color: '#1B5E39',
+                }}
+              >
+                Login as Admin
+              </Text>
+            </Pressable>
+
+            {/* Login as logidriver Button */}
+            <Pressable
+              onPress={() => loginAsRole('driver')}
+              style={({ pressed }) => [
+                {
+                  height: 48,
+                  backgroundColor: '#EAF4ED',
+                  borderRadius: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                },
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <UserIcon size={18} color="#1B5E39" />
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  fontWeight: '700',
+                  color: '#1B5E39',
+                }}
+              >
+                Login as logidriver
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          /* Register Footer: Already have an account? Log In */
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              paddingVertical: 20,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: '#6B7280' }}>
+              Already have an account?{' '}
+            </Text>
+            <Pressable onPress={() => setView('login')}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: '#1B5E39',
+                }}
+              >
+                Log In
+              </Text>
+            </Pressable>
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
+export default AuthScreen;
