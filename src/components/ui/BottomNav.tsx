@@ -23,12 +23,13 @@ export interface BottomNavProps {
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
-  const { currentUser, navState, setTab, cart, orders, complaints } = useApp();
+  const { currentUser, navState, setTab, cart, orders, complaints, users } = useApp();
   const insets = useSafeAreaInsets();
   const currentTab = navState.activeTab;
 
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
   const pendingComplaintsCount = complaints.filter(c => c.status === 'pending').length;
+  const pendingUsersCount = users.filter(u => !u.verified).length;
   const activeDeliveriesCount = orders.filter(
     o => o.status === 'ready_for_pickup' || o.status === 'out_for_delivery'
   ).length;
@@ -74,7 +75,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
     ],
     admin: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'users', label: 'Users', icon: Users },
+      {
+        id: 'users',
+        label: 'Users',
+        icon: Users,
+        badge: pendingUsersCount > 0 ? pendingUsersCount : undefined,
+      },
       { id: 'categories', label: 'Categories', icon: Tag },
       {
         id: 'complaints',

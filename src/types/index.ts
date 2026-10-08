@@ -20,10 +20,29 @@ export interface User {
   nicNumber?: string;
   farmName?: string;
   farmSizeAcres?: number;
+  yearsFarming?: number;
   vehicleType?: 'Three-Wheeler' | 'Light Truck (Dimas)' | 'Motorbike' | 'Lorry';
   vehiclePlate?: string;
   rating?: number;
   totalRatings?: number;
+  createdAt: string;
+  isDeactivated?: boolean;
+  verificationDocuments?: {
+    id: string;
+    type: 'nic_front' | 'nic_back' | 'grama_certificate' | 'farm_deed' | 'business_reg';
+    title: string;
+    url: string;
+    issuedDate?: string;
+  }[];
+}
+
+export interface CropCategory {
+  id: string;
+  name: string;
+  description: string;
+  iconName: string;
+  iconUrl?: string;
+  itemCount: number;
   createdAt: string;
 }
 

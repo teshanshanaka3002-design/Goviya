@@ -10,6 +10,7 @@ import {
   MarketPriceRecord,
   Complaint,
   PlatformStat,
+  CropCategory,
 } from '../types';
 import {
   mockUsers,
@@ -20,6 +21,7 @@ import {
   mockMarketPrices,
   mockComplaints,
   mockPlatformStats,
+  mockCategories,
 } from './mockData';
 
 export interface PlaceOrderInput {
@@ -57,6 +59,8 @@ interface NavigationState {
   selectedListingId: string | null;
   selectedOrderId: string | null;
   selectedConversationId: string | null;
+  selectedUserId?: string | null;
+  selectedComplaintId?: string | null;
   authRole?: Role;
   authView?: 'login' | 'register';
 }
@@ -73,6 +77,7 @@ interface AppContextType {
   marketPrices: MarketPriceRecord[];
   complaints: Complaint[];
   users: User[];
+  categories: CropCategory[];
   platformStats: PlatformStat;
   isSimulatorFrame: boolean;
   toggleSimulatorFrame: () => void;
@@ -92,6 +97,8 @@ interface AppContextType {
       listingId?: string;
       orderId?: string;
       conversationId?: string;
+      userId?: string;
+      complaintId?: string;
       initialRole?: Role;
       initialView?: 'login' | 'register';
     }
@@ -123,12 +130,19 @@ interface AppContextType {
   clearListingPhotos: (listingId: string) => void;
   deleteListing: (listingId: string) => void;
   updateListing: (listingId: string, data: Partial<Listing>) => void;
+  // Categories
+  addCategory: (category: { name: string; description: string; iconName: string; iconUrl?: string }) => void;
+  updateCategory: (id: string, data: Partial<CropCategory>) => void;
+  deleteCategory: (id: string) => void;
   // Chat
   sendMessage: (conversationId: string, content: string, type?: 'text' | 'order_request', extra?: any) => void;
   getOrCreateConversation: (targetId: string, targetName: string, cropName?: string, targetRole?: Role) => string;
   // Admin
   adminVerifyUser: (userId: string, approved: boolean) => void;
+  adminToggleDeactivateUser: (userId: string) => void;
   adminResolveComplaint: (complaintId: string, action: 'resolved' | 'dismissed', note: string) => void;
+  adminWarnUser: (complaintId: string, note?: string) => void;
+  adminRemoveListingFromComplaint: (complaintId: string, listingId: string, reason?: string) => void;
   // User profile & Support
   updateCurrentUser: (userData: Partial<User>) => void;
   fileComplaint: (complaintData: Omit<Complaint, '_id' | 'createdAt' | 'status'>) => Complaint;
@@ -198,7 +212,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Data Collections
   const [users, setUsers] = useState<User[]>(() => {
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'users');
-    return saved ? JSON.parse(saved) : mockUsers;
+    if (!saved) return mockUsers;
+    try {
+      const parsed: User[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map(u => u._id));
+      const missingMocks = mockUsers.filter(u => !existingIds.has(u._id));
+      return [...parsed, ...missingMocks];
+    } catch (e) {
+      return mockUsers;
+    }
   });
 
   const [listings, setListings] = useState<Listing[]>(() => {
@@ -238,7 +260,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [complaints, setComplaints] = useState<Complaint[]>(() => {
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'complaints');
-    return saved ? JSON.parse(saved) : mockComplaints;
+    if (!saved) return mockComplaints;
+    try {
+      const parsed: Complaint[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map(c => c._id));
+      const missingMocks = mockComplaints.filter(c => !existingIds.has(c._id));
+      return [...parsed, ...missingMocks];
+    } catch (e) {
+      return mockComplaints;
+    }
+  });
+
+  const [categories, setCategories] = useState<CropCategory[]>(() => {
+    const saved = safeStorage.getItem(STORAGE_PREFIX + 'categories');
+    if (!saved) return mockCategories;
+    try {
+      const parsed: CropCategory[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map(c => c.id));
+      const missingMocks = mockCategories.filter(c => !existingIds.has(c.id));
+      return [...parsed, ...missingMocks];
+    } catch (e) {
+      return mockCategories;
+    }
   });
 
   const [platformStats] = useState<PlatformStat>(mockPlatformStats);
@@ -279,6 +322,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     safeStorage.setItem(STORAGE_PREFIX + 'messages', JSON.stringify(messages));
   }, [messages]);
+
+  useEffect(() => {
+    safeStorage.setItem(STORAGE_PREFIX + 'categories', JSON.stringify(categories));
+  }, [categories]);
 
   // Actions
   const toggleSimulatorFrame = () => {
@@ -400,6 +447,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedListingId: null,
       selectedOrderId: null,
       selectedConversationId: null,
+      selectedUserId: null,
+      selectedComplaintId: null,
     });
   };
 
@@ -411,6 +460,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedListingId: null,
       selectedOrderId: null,
       selectedConversationId: null,
+      selectedUserId: null,
+      selectedComplaintId: null,
     }));
   };
 
@@ -420,6 +471,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       listingId?: string;
       orderId?: string;
       conversationId?: string;
+      userId?: string;
+      complaintId?: string;
       initialRole?: Role;
       initialView?: 'login' | 'register';
     }
@@ -433,6 +486,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedListingId: meta?.listingId ?? prev.selectedListingId,
       selectedOrderId: meta?.orderId ?? prev.selectedOrderId,
       selectedConversationId: meta?.conversationId ?? prev.selectedConversationId,
+      selectedUserId: meta?.userId ?? prev.selectedUserId,
+      selectedComplaintId: meta?.complaintId ?? prev.selectedComplaintId,
       authRole: meta?.initialRole ?? prev.authRole,
       authView: meta?.initialView ?? prev.authView,
     }));
@@ -445,6 +500,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedListingId: null,
       selectedOrderId: null,
       selectedConversationId: null,
+      selectedUserId: null,
+      selectedComplaintId: null,
     }));
   };
 
@@ -1077,9 +1134,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newConv._id;
   };
 
+  const addCategory = (data: { name: string; description: string; iconName: string; iconUrl?: string }) => {
+    const newCat: CropCategory = {
+      id: 'cat_' + Date.now(),
+      name: data.name.trim(),
+      description: data.description.trim(),
+      iconName: data.iconName || 'Package',
+      iconUrl: data.iconUrl,
+      itemCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    setCategories(prev => [newCat, ...prev]);
+  };
+
+  const updateCategory = (id: string, data: Partial<CropCategory>) => {
+    setCategories(prev => prev.map(c => (c.id === id ? { ...c, ...data } : c)));
+  };
+
+  const deleteCategory = (id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+  };
+
   const adminVerifyUser = (userId: string, approved: boolean) => {
     setUsers(prev =>
       prev.map(u => (u._id === userId ? { ...u, verified: approved } : u))
+    );
+  };
+
+  const adminToggleDeactivateUser = (userId: string) => {
+    setUsers(prev =>
+      prev.map(u => (u._id === userId ? { ...u, isDeactivated: !u.isDeactivated } : u))
     );
   };
 
@@ -1092,6 +1176,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map(c =>
         c._id === complaintId
           ? { ...c, status: action, resolutionNote: note }
+          : c
+      )
+    );
+  };
+
+  const adminWarnUser = (complaintId: string, note?: string) => {
+    setComplaints(prev =>
+      prev.map(c =>
+        c._id === complaintId
+          ? {
+              ...c,
+              status: 'resolved',
+              resolutionNote:
+                note ||
+                `Formal administrative warning issued to ${c.targetName}. Recorded in producer audit profile.`,
+            }
+          : c
+      )
+    );
+  };
+
+  const adminRemoveListingFromComplaint = (complaintId: string, listingId: string, reason?: string) => {
+    setListings(prev => prev.map(l => (l._id === listingId ? { ...l, status: 'removed' } : l)));
+    setComplaints(prev =>
+      prev.map(c =>
+        c._id === complaintId
+          ? {
+              ...c,
+              status: 'resolved',
+              resolutionNote:
+                reason ||
+                `Listing removed by platform administrator due to verified trade complaint.`,
+            }
           : c
       )
     );
@@ -1129,6 +1246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         marketPrices,
         complaints,
         users,
+        categories,
         platformStats,
         isSimulatorFrame,
         toggleSimulatorFrame,
@@ -1166,10 +1284,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearListingPhotos,
         deleteListing,
         updateListing,
+        addCategory,
+        updateCategory,
+        deleteCategory,
         sendMessage,
         getOrCreateConversation,
         adminVerifyUser,
+        adminToggleDeactivateUser,
         adminResolveComplaint,
+        adminWarnUser,
+        adminRemoveListingFromComplaint,
         updateCurrentUser,
         fileComplaint,
       }}
