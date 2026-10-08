@@ -1864,6 +1864,56 @@ export const BuyerCheckoutScreen: React.FC = () => {
           </View>
         </Card>
 
+        {/* If Farm Gate Pickup is selected, show farmer's location, address, and contact number (Requirement 6) */}
+        {deliveryMode === 'pickup' && (
+          <Card padding="md" variant="mint" style={{ borderColor: '#86EFAC', borderWidth: 1.5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <MapPin size={18} color="#1F5C3A" />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#1F5C3A' }}>
+                  Farmer Pickup Point & Direct Contact
+                </Text>
+              </View>
+              <View style={{ backgroundColor: '#E6F2E8', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', color: '#1F5C3A' }}>FREE PICKUP</Text>
+              </View>
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#4B6B56', fontWeight: '700' }}>Farmer Name:</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A' }}>
+                  {cart[0]?.listing.farmerName || 'Sunil Bandara'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12, color: '#4B6B56', fontWeight: '700' }}>Farm Address:</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 10 }}>
+                  {cart[0] ? `${cart[0].listing.farmerName}'s Farm, ${cart[0].listing.location.town}, ${cart[0].listing.location.district}` : 'Highland Organics, Kandapola, Nuwara Eliya'}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, color: '#4B6B56', fontWeight: '700' }}>Farmer Phone:</Text>
+                <Pressable
+                  onPress={() => Linking.openURL(`tel:${cart[0]?.listing.farmerPhone || '+94771234567'}`)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                >
+                  <Phone size={12} color="#1F5C3A" />
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1F5C3A' }}>
+                    {cart[0]?.listing.farmerPhone || '+94 77 123 4567'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={{ marginTop: 8, padding: 8, backgroundColor: '#E6F2E8', borderRadius: 8 }}>
+              <Text style={{ fontSize: 11, color: '#1F5C3A', fontWeight: '600', lineHeight: 16 }}>
+                Direct Farm Gate Collection: You will be issued a 4-digit Order PIN to collect fresh produce directly from the producer once harvested and packed.
+              </Text>
+            </View>
+          </Card>
+        )}
+
         {/* Delivery Details Card */}
         <Card padding="md">
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>
@@ -1884,7 +1934,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
               placeholder="+94 77 ..."
             />
             {deliveryMode === 'delivery' && (
-              <>
+              <View style={{ gap: 12 }}>
                 <Input
                   label="Delivery Address"
                   value={address}
@@ -1897,7 +1947,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
                   onChangeText={setDistrict}
                   placeholder="e.g. Colombo, Kandy"
                 />
-              </>
+              </View>
             )}
             <Input
               label="Delivery Notes (Optional)"
@@ -2027,11 +2077,44 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
               <Text style={{ fontSize: 14, fontWeight: '900', color: '#1F5C3A' }}>{`LKR ${order.total.toLocaleString()}`}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 12.5, color: '#64748B' }}>Delivery To:</Text>
-              <Text style={{ fontSize: 12.5, color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }} numberOfLines={1}>
-                {order.deliveryAddress}
+              <Text style={{ fontSize: 12.5, color: '#64748B' }}>Fulfillment:</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '800', color: order.deliveryType === 'pickup' ? '#1D4ED8' : '#065F46' }}>
+                {order.deliveryType === 'pickup' ? 'Farm Gate Self-Pickup' : 'Doorstep Delivery'}
               </Text>
             </View>
+
+            {order.deliveryType === 'pickup' ? (
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 12.5, color: '#64748B' }}>Farmer & Location:</Text>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }}>
+                    {order.farmerName} · {order.farmerAddress}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12.5, color: '#64748B' }}>Farmer Contact:</Text>
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1F5C3A' }}>
+                    {order.farmerPhone}
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: '#EFF6FF', padding: 10, borderRadius: 10, marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                  <View>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase' }}>PICKUP PIN</Text>
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#1E40AF' }}>{order.pickupPin}</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#3B82F6', flex: 1, marginLeft: 12 }}>
+                    Show this 4-digit PIN to farmer {order.farmerName} when collecting.
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B' }}>Delivery To:</Text>
+                <Text style={{ fontSize: 12.5, color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }} numberOfLines={1}>
+                  {order.deliveryAddress}
+                </Text>
+              </View>
+            )}
           </View>
         </Card>
       )}
@@ -2062,14 +2145,16 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
 
 // ===================== 7. BUYER ORDER TRACKING / MY ORDERS SCREEN =====================
 export const BuyerOrderTrackingScreen: React.FC = () => {
-  const { orders, navState, goToSubScreen, goBack } = useApp();
+  const { orders, navState, buyerConfirmPickup, goToSubScreen, goBack } = useApp();
 
   const myOrders = orders;
   const activeOrder = navState.selectedOrderId
     ? orders.find(o => o._id === navState.selectedOrderId)
     : myOrders[0];
 
-  const STATUS_STEPS: OrderStatus[] = [
+  const isPickup = activeOrder?.deliveryType === 'pickup';
+
+  const DELIVERY_STEPS: OrderStatus[] = [
     'pending',
     'accepted',
     'preparing',
@@ -2078,7 +2163,35 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
     'delivered',
   ];
 
-  const getStepIndex = (status: OrderStatus) => STATUS_STEPS.indexOf(status);
+  const PICKUP_STEPS: OrderStatus[] = [
+    'pending',
+    'accepted',
+    'preparing',
+    'ready_for_pickup',
+    'delivered',
+  ];
+
+  const statusSteps = isPickup ? PICKUP_STEPS : DELIVERY_STEPS;
+  const currentIdx = activeOrder ? statusSteps.indexOf(activeOrder.status) : 0;
+
+  const deliveryLabels = [
+    { label: 'Order Placed & Verified', desc: 'Farmer notified at farm gate' },
+    { label: 'Farmer Accepted', desc: 'Harvest scheduled by farmer' },
+    { label: 'Harvesting & Packing', desc: 'Graded & packed into crates' },
+    { label: 'Ready at Farm Gate', desc: 'Awaiting logistics driver dispatch' },
+    { label: 'Out for Final Delivery', desc: 'Driver en route to your doorstep' },
+    { label: 'Delivered to Doorstep', desc: 'Handover complete & verified' },
+  ];
+
+  const pickupLabels = [
+    { label: 'Order Placed & Confirmed', desc: 'Direct farm order received' },
+    { label: 'Farmer Accepted', desc: 'Harvest batch scheduled' },
+    { label: 'Harvesting & Packing', desc: 'Produce crated at farm gate' },
+    { label: 'Ready for Farm Gate Pickup', desc: 'Ready! You can now visit to collect' },
+    { label: 'Collected from Farm Gate', desc: 'PIN verified & handover complete' },
+  ];
+
+  const stepsToRender = isPickup ? pickupLabels : deliveryLabels;
 
   return (
     <ScrollView style={s.mainScroll} contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
@@ -2094,29 +2207,184 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
 
         {/* Active Selected Order Tracker */}
         {activeOrder && (
-          <Card padding="md" variant="mint">
+          <Card padding="md" variant="mint" style={{ gap: 14 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View>
-                <Text style={{ fontSize: 11, color: '#4B6B56', fontWeight: '800', letterSpacing: 0.5 }}>ACTIVE SHIPMENT</Text>
-                <Text style={{ fontSize: 17, fontWeight: '900', color: '#0F172A', marginTop: 2 }}>{activeOrder.orderNumber}</Text>
+                <View className="flex-row items-center gap-2">
+                  <Text style={{ fontSize: 11, color: '#4B6B56', fontWeight: '800', letterSpacing: 0.5 }}>
+                    ACTIVE SHIPMENT
+                  </Text>
+                  <View
+                    style={{
+                      paddingHorizontal: 6,
+                      paddingVertical: 1.5,
+                      borderRadius: 6,
+                      backgroundColor: isPickup ? '#DBEAFE' : '#D1FAE5',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 9.5,
+                        fontWeight: '800',
+                        color: isPickup ? '#1D4ED8' : '#065F46',
+                      }}
+                    >
+                      {isPickup ? 'FARM GATE SELF-PICKUP' : 'DOORSTEP DELIVERY'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: '#0F172A', marginTop: 2 }}>
+                  {activeOrder.orderNumber}
+                </Text>
               </View>
               <StatusPill status={activeOrder.status} />
             </View>
 
-            <View style={{ marginTop: 16 }}>
+            {/* If Self-Pickup: Show Farmer Details, Location, Phone & Pickup PIN (Requirement 6) */}
+            {isPickup && (
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 14,
+                  padding: 12,
+                  borderWidth: 1.5,
+                  borderColor: '#93C5FD',
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MapPin size={18} color="#1D4ED8" />
+                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#1E3A8A' }}>
+                      Farm Gate Pickup Point
+                    </Text>
+                  </View>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Phone size={12} color="#1D4ED8" />}
+                    onPress={() => Linking.openURL(`tel:${activeOrder.farmerPhone || '+94771234567'}`)}
+                  >
+                    Call Farmer
+                  </Button>
+                </View>
+
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                    {activeOrder.farmerName}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#475569' }}>
+                    {activeOrder.farmerAddress}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: '#64748B', fontStyle: 'italic' }}>
+                    {activeOrder.pickupLocation?.directions || 'Located near Agrarian Services Centre. Call farmer on approach.'}
+                  </Text>
+                </View>
+
+                {/* 4-digit PIN Card */}
+                <View
+                  style={{
+                    backgroundColor: '#EFF6FF',
+                    padding: 10,
+                    borderRadius: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderWidth: 1,
+                    borderColor: '#BFDBFE',
+                  }}
+                >
+                  <View>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4ED8', textTransform: 'uppercase' }}>
+                      COLLECTION VERIFICATION PIN
+                    </Text>
+                    <Text style={{ fontSize: 20, fontWeight: '900', color: '#1E40AF', letterSpacing: 2 }}>
+                      {activeOrder.pickupPin}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#3B82F6', flex: 1, marginLeft: 12 }}>
+                    Show this PIN to farmer {activeOrder.farmerName} upon collection.
+                  </Text>
+                </View>
+
+                {/* Direct Action when Ready */}
+                {activeOrder.status === 'ready_for_pickup' && (
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    <View style={{ backgroundColor: '#FEF3C7', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#B45309', textAlign: 'center' }}>
+                        Your produce is packed and waiting at the farm gate!
+                      </Text>
+                    </View>
+                    <Button
+                      variant="primary"
+                      fullWidth
+                      size="md"
+                      leftIcon={<Check size={16} color="#ffffff" strokeWidth={2.5} />}
+                      onPress={() => buyerConfirmPickup(activeOrder._id)}
+                    >
+                      I Have Collected My Produce
+                    </Button>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* If Doorstep Delivery: Uber Eats Style Driver Card (Requirement 4) */}
+            {!isPickup && Boolean(activeOrder.driverName) && (
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 14,
+                  padding: 12,
+                  borderWidth: 1.5,
+                  borderColor: '#86EFAC',
+                  gap: 8,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Avatar name={activeOrder.driverName || 'Driver'} size="md" role="driver" />
+                    <View>
+                      <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A' }}>
+                        {activeOrder.driverName}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#15803D', fontWeight: '700' }}>
+                        4.95 ★ Certified Fleet Partner
+                      </Text>
+                    </View>
+                  </View>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Phone size={12} color="#1F5C3A" />}
+                    onPress={() => Linking.openURL(`tel:${activeOrder.driverPhone || '+94782345678'}`)}
+                  >
+                    Call Driver
+                  </Button>
+                </View>
+
+                <View style={{ backgroundColor: '#F8FAFC', padding: 8, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11.5, color: '#475569', fontWeight: '600' }}>
+                    Vehicle: {activeOrder.driverVehicle || 'Light Truck'}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: '#1F5C3A', fontWeight: '700', marginTop: 2 }}>
+                    {activeOrder.status === 'ready_for_pickup'
+                      ? 'Driver assigned · En route to farm gate for crate pickup'
+                      : activeOrder.status === 'out_for_delivery'
+                      ? 'In transit · Produce picked up from farm and heading to your doorstep!'
+                      : 'Delivered successfully · Handover verified'}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Stepper Progression */}
+            <View style={{ marginTop: 6 }}>
               <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>
-                Harvest & Dispatch Stepper
+                Fulfillment & Dispatch Stepper
               </Text>
               <View style={{ gap: 0 }}>
-                {[
-                  { label: 'Order Placed & Verified', desc: 'Received at farm gate' },
-                  { label: 'Farmer Accepted', desc: 'Dawn harvesting assigned' },
-                  { label: 'Graded & Crated', desc: 'Packed into ventilated crates' },
-                  { label: 'Handed to Logistics Fleet', desc: 'Loaded on Goviya truck' },
-                  { label: 'Out for Final Delivery', desc: 'Driver en route' },
-                  { label: 'Delivered & Inspected', desc: 'Handover complete' },
-                ].map((step, idx, arr) => {
-                  const currentIdx = getStepIndex(activeOrder.status);
+                {stepsToRender.map((step, idx, arr) => {
                   const isDone = idx <= currentIdx;
                   const isCurrent = idx === currentIdx;
                   const isLast = idx === arr.length - 1;
@@ -2156,6 +2424,51 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
                 })}
               </View>
             </View>
+
+            {/* Order Items with Photos */}
+            <View style={{ backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, gap: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: '#475569', textTransform: 'uppercase' }}>
+                Items in this Order
+              </Text>
+              {activeOrder.items.map((item, idx) => {
+                const hasPhoto =
+                  item.photoUrl &&
+                  (item.photoUrl.startsWith('data:image') || item.photoUrl.startsWith('http'));
+
+                return (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: '#F1F5F9',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {hasPhoto ? (
+                        <Image source={{ uri: item.photoUrl }} style={{ width: 40, height: 40 }} resizeMode="cover" />
+                      ) : (
+                        <ProduceVisual type={item.cropName} size="sm" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>
+                        {item.cropName}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>
+                        {item.quantityKg} kg · LKR {item.pricePerKg}/kg
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1F5C3A' }}>
+                      {`LKR ${(item.pricePerKg * item.quantityKg).toLocaleString()}`}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
           </Card>
         )}
 
@@ -2173,9 +2486,29 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
               onPress={() => goToSubScreen('order_tracking', { orderId: order._id })}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
-                  {order.orderNumber}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                    {order.orderNumber}
+                  </Text>
+                  <View
+                    style={{
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      borderRadius: 4,
+                      backgroundColor: order.deliveryType === 'pickup' ? '#EFF6FF' : '#ECFDF5',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 9.5,
+                        fontWeight: '700',
+                        color: order.deliveryType === 'pickup' ? '#1D4ED8' : '#047857',
+                      }}
+                    >
+                      {order.deliveryType === 'pickup' ? 'Farm Pickup' : 'Delivery'}
+                    </Text>
+                  </View>
+                </View>
                 <StatusPill status={order.status} />
               </View>
 

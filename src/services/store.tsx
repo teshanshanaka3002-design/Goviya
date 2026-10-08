@@ -112,6 +112,7 @@ interface AppContextType {
   driverAcceptOrder: (orderId: string) => void;
   driverConfirmPickup: (orderId: string) => void;
   driverConfirmDelivery: (orderId: string, proofNote?: string) => void;
+  buyerConfirmPickup: (orderId: string) => void;
   // Listings
   addListing: (listingData: Omit<Listing, '_id' | 'farmerId' | 'farmerName' | 'farmerPhone' | 'farmerRating'>) => void;
   updateListingStatus: (listingId: string, status: 'active' | 'out_of_stock' | 'removed') => void;
@@ -764,8 +765,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 status,
                 label,
                 timestamp: nowStr,
-                note: note || (status === 'ready_for_pickup' && ord.deliveryType === 'pickup'
-                  ? `Packed and awaiting buyer pickup at ${ord.farmerName}'s farm gate`
+                note: note || (status === 'ready_for_pickup'
+                  ? (ord.deliveryType === 'pickup'
+                      ? `Packed and awaiting buyer pickup at ${ord.farmerName}'s farm gate. Bring your Order PIN.`
+                      : `Packed into crates, weighed, and awaiting fleet driver dispatch at ${ord.farmerName}'s farm gate`)
                   : undefined),
               },
             ],
@@ -891,6 +894,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 label: 'Successfully Delivered to Buyer',
                 timestamp: nowStr,
                 note: `Driver ${driverName} delivered parcel to buyer ${ord.buyerName} at ${ord.deliveryAddress}. Handover verified.`,
+              },
+            ],
+          };
+        }
+        return ord;
+      })
+    );
+  };
+
+  const buyerConfirmPickup = (orderId: string) => {
+    setOrders(prev =>
+      prev.map(ord => {
+        if (ord._id === orderId) {
+          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return {
+            ...ord,
+            status: 'delivered',
+            deliveredAt: nowStr,
+            deliveredBy: 'Direct Farm Gate Handover',
+            deliveryProofNote: `Handed over at ${ord.farmerName}'s farm gate. Order PIN ${ord.pickupPin} verified.`,
+            updatedAt: new Date().toISOString(),
+            timeline: [
+              ...ord.timeline,
+              {
+                status: 'delivered',
+                label: 'Collected from Farm Gate',
+                timestamp: nowStr,
+                note: `Buyer ${ord.buyerName} verified Order PIN ${ord.pickupPin} and collected fresh produce directly from farmer ${ord.farmerName}. Handover complete.`,
               },
             ],
           };
@@ -1125,6 +1156,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         driverAcceptOrder,
         driverConfirmPickup,
         driverConfirmDelivery,
+        buyerConfirmPickup,
         addListing,
         updateListingStatus,
         updateListingPhotos,

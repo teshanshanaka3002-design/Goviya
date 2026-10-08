@@ -56,12 +56,15 @@ export const HARVEST_PHOTO_PRESETS = [
 
 // ===================== 1. FARMER HOME DASHBOARD =====================
 export const FarmerHomeScreen: React.FC = () => {
-  const { listings, orders, currentUser, setTab, goToSubScreen } = useApp();
+  const { listings, orders, currentUser, users, farmerAcceptOrder, farmerRejectOrder, setTab, goToSubScreen } = useApp();
 
   const currentFarmerId = currentUser?.role === 'farmer' ? currentUser._id : 'user_farmer_1';
+  const currentFarmer = users.find(u => u._id === currentFarmerId) || currentUser;
 
   const myListings = listings.filter(l => l.farmerId === currentFarmerId && l.status === 'active');
-  const myOrders = orders.filter(o => o.farmerId === currentFarmerId);
+  const myOrders = orders.filter(
+    o => o.farmerId === currentFarmerId || (currentFarmer && o.farmerName === currentFarmer.name)
+  );
 
   const pendingOrders = myOrders.filter(o => o.status === 'pending');
   const preparingOrders = myOrders.filter(o => o.status === 'accepted' || o.status === 'preparing');
@@ -74,7 +77,7 @@ export const FarmerHomeScreen: React.FC = () => {
       <View style={{ gap: 16 }}>
         {/* Profile Card */}
         <Card padding="md" className="bg-[#1F5C3A] flex-row items-center gap-3">
-          <Avatar name={currentUser?.name || 'Sunil Shantha'} size="lg" role="farmer" />
+          <Avatar name={currentUser?.name || 'Sunil Bandara'} size="lg" role="farmer" />
           <View className="flex-1">
             <Text className="text-base font-extrabold text-white">
               {currentUser?.farmName || "Sunil's Highland Farm"}
@@ -87,15 +90,19 @@ export const FarmerHomeScreen: React.FC = () => {
 
         {/* Metrics Row */}
         <View className="flex-row gap-2">
-          <Card padding="sm" className="flex-1 bg-white items-center">
-            <Text className="text-[10px] text-[#6B7280] font-bold">PENDING ORDERS</Text>
-            <Text className="text-lg font-black text-[#B45309]">{pendingOrders.length}</Text>
-          </Card>
+          <Pressable onPress={() => setTab('orders')} style={{ flex: 1 }}>
+            <Card padding="sm" className="bg-white items-center">
+              <Text className="text-[10px] text-[#6B7280] font-bold">PENDING ORDERS</Text>
+              <Text className="text-lg font-black text-[#B45309]">{pendingOrders.length}</Text>
+            </Card>
+          </Pressable>
 
-          <Card padding="sm" className="flex-1 bg-white items-center">
-            <Text className="text-[10px] text-[#6B7280] font-bold">ACTIVE CROPS</Text>
-            <Text className="text-lg font-black text-[#1F5C3A]">{myListings.length}</Text>
-          </Card>
+          <Pressable onPress={() => setTab('listings')} style={{ flex: 1 }}>
+            <Card padding="sm" className="bg-white items-center">
+              <Text className="text-[10px] text-[#6B7280] font-bold">ACTIVE CROPS</Text>
+              <Text className="text-lg font-black text-[#1F5C3A]">{myListings.length}</Text>
+            </Card>
+          </Pressable>
 
           <Card padding="sm" className="flex-1 bg-white items-center">
             <Text className="text-[10px] text-[#6B7280] font-bold">DELIVERED LKR</Text>
@@ -119,18 +126,86 @@ export const FarmerHomeScreen: React.FC = () => {
         {/* Pending Action Required Orders */}
         {pendingOrders.length > 0 && (
           <View style={{ gap: 8 }}>
-            <Text className="text-sm font-bold text-[#1A1A1A]">Pending Action Required</Text>
-            {pendingOrders.map(order => (
-              <Card key={order._id} padding="md" className="border-l-4 border-l-[#B45309]">
-                <View className="flex-row justify-between items-center">
-                  <Text className="text-xs font-bold text-[#1A1A1A]">{order.orderNumber}</Text>
-                  <StatusPill status="pending" />
-                </View>
-                <Text className="text-xs text-[#6B7280] mt-1">
-                  Buyer: {order.buyerName} · {order.items[0]?.cropName} ({order.items[0]?.quantityKg}kg)
-                </Text>
-              </Card>
-            ))}
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm font-bold text-[#1A1A1A]">Pending Action Required ({pendingOrders.length})</Text>
+              <Pressable onPress={() => setTab('orders')}>
+                <Text className="text-xs font-bold text-[#1F5C3A]">View All Orders</Text>
+              </Pressable>
+            </View>
+            {pendingOrders.map(order => {
+              const firstItem = order.items[0];
+              const hasPhoto =
+                firstItem?.photoUrl &&
+                (firstItem.photoUrl.startsWith('data:image') || firstItem.photoUrl.startsWith('http'));
+
+              return (
+                <Card key={order._id} padding="md" className="border-l-4 border-l-[#B45309] gap-2.5">
+                  <View className="flex-row justify-between items-center">
+                    <View className="flex-row items-center gap-2">
+                      <Text className="text-xs font-black text-[#1A1A1A]">{order.orderNumber}</Text>
+                      <View className={`px-2 py-0.5 rounded text-[10px] ${order.deliveryType === 'pickup' ? 'bg-[#EFF6FF]' : 'bg-[#ECFDF5]'}`}>
+                        <Text className={`text-[10px] font-bold ${order.deliveryType === 'pickup' ? 'text-[#1D4ED8]' : 'text-[#065F46]'}`}>
+                          {order.deliveryType === 'pickup' ? 'Farm Pickup' : 'Doorstep'}
+                        </Text>
+                      </View>
+                    </View>
+                    <StatusPill status="pending" />
+                  </View>
+
+                  <View className="flex-row items-center gap-3">
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        backgroundColor: '#F3F4F6',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                      }}
+                    >
+                      {hasPhoto ? (
+                        <Image source={{ uri: firstItem.photoUrl }} style={{ width: 44, height: 44 }} resizeMode="cover" />
+                      ) : (
+                        <ProduceVisual type={firstItem?.cropName || 'carrots'} size="sm" />
+                      )}
+                    </View>
+
+                    <View className="flex-1">
+                      <Text className="text-xs font-bold text-[#1A1A1A]">
+                        {firstItem?.cropName} ({firstItem?.quantityKg}kg)
+                        {order.items.length > 1 ? ` +${order.items.length - 1} more` : ''}
+                      </Text>
+                      <Text className="text-[11px] text-[#6B7280] mt-0.5">
+                        Buyer: {order.buyerName} · LKR {order.total.toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="flex-row gap-2 pt-2 border-t border-[#F0F0EE]">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      style={{ flex: 1 }}
+                      onPress={() => farmerRejectOrder(order._id, 'Capacity full')}
+                    >
+                      Decline
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      style={{ flex: 1 }}
+                      leftIcon={<CheckCircle2 size={14} color="#ffffff" />}
+                      onPress={() => farmerAcceptOrder(order._id)}
+                    >
+                      Accept
+                    </Button>
+                  </View>
+                </Card>
+              );
+            })}
           </View>
         )}
 

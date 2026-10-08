@@ -17,6 +17,8 @@ import {
   ShieldCheck,
   Search,
   Filter,
+  Truck,
+  MapPin,
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { Card } from '../../components/ui/Card';
@@ -160,6 +162,88 @@ export const AdminDashboardScreen: React.FC = () => {
                     Approve & Verify
                   </Button>
                 </View>
+              </Card>
+            ))
+          )}
+        </View>
+
+        {/* Live Order Fulfillment Queue (All Platform Orders) */}
+        <View style={{ gap: 8 }}>
+          <View className="flex-row items-center justify-between">
+            <View>
+              <Text className="text-sm font-bold text-[#1A1A1A]">
+                Live Platform Orders & Fulfillment ({orders.length})
+              </Text>
+              <Text className="text-[10px] text-[#6B7280]">
+                Real-time tracking across Buyers, Farmers & Logistics Fleet
+              </Text>
+            </View>
+            <View className="bg-[#E6F2E8] px-2 py-0.5 rounded-full border border-[#CDE5D2]">
+              <Text className="text-[10px] font-bold text-[#1F5C3A]">Sync Active</Text>
+            </View>
+          </View>
+
+          {orders.length === 0 ? (
+            <Card padding="md" className="items-center py-5">
+              <Package size={20} color="#6B7280" />
+              <Text className="text-xs text-[#6B7280] font-bold mt-1">No Orders in Platform Queue</Text>
+            </Card>
+          ) : (
+            orders.slice(0, 10).map(order => (
+              <Card key={order._id} padding="md" style={{ gap: 8 }}>
+                <View className="flex-row items-center justify-between border-b border-[#F0F0EE] pb-2">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-xs font-bold text-[#1A1A1A]">{order.orderNumber}</Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 1,
+                        borderRadius: 4,
+                        backgroundColor: order.deliveryType === 'pickup' ? '#EFF6FF' : '#ECFDF5',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 9,
+                          fontWeight: '700',
+                          color: order.deliveryType === 'pickup' ? '#1D4ED8' : '#047857',
+                        }}
+                      >
+                        {order.deliveryType === 'pickup' ? 'Farm Pickup' : 'Fleet Delivery'}
+                      </Text>
+                    </View>
+                  </View>
+                  <StatusPill status={order.status} />
+                </View>
+
+                <View className="flex-row justify-between items-center">
+                  <View className="flex-1 mr-2">
+                    <Text className="text-xs text-[#4B5563]">
+                      <Text className="font-semibold text-[#1A1A1A]">{order.farmerName}</Text> →{' '}
+                      <Text className="font-semibold text-[#1A1A1A]">{order.buyerName}</Text>
+                    </Text>
+                    <Text className="text-[10px] text-[#6B7280] mt-0.5">
+                      {order.items.map(i => `${i.cropName} (${i.quantityKg}kg)`).join(', ')}
+                    </Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="text-xs font-black text-[#1F5C3A]">
+                      LKR {order.total.toLocaleString()}
+                    </Text>
+                    <Text className="text-[9px] text-[#6B7280]">
+                      {order.paymentMethod.replace(/_/g, ' ').toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                {Boolean(order.driverName) && (
+                  <View className="bg-[#F8FAFC] px-2 py-1 rounded-md flex-row items-center justify-between">
+                    <Text className="text-[10px] text-[#64748B]">
+                      Fleet Driver: <Text className="font-semibold text-[#0F172A]">{order.driverName}</Text> ({order.driverVehicle})
+                    </Text>
+                    <Text className="text-[10px] text-[#15803D] font-bold">Assigned</Text>
+                  </View>
+                )}
               </Card>
             ))
           )}
