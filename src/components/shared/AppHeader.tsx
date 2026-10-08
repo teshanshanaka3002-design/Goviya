@@ -70,6 +70,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     market_prices: 'Official Mandi Rates',
     nearby_map: 'Nearby Producers Map',
     add_listing: 'Post New Harvest',
+    driver_order_detail: 'Delivery Order Details',
+    edit_driver_profile: 'Driver Profile',
   };
 
   const effectiveTitle =

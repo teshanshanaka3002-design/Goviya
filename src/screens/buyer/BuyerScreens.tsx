@@ -62,6 +62,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
 import { SellerProfileModal } from '../../components/shared/SellerProfileModal';
+import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
 import { Listing, OrderStatus } from '../../types';
 import { isValidPhotoUrl } from '../../services/imageService';
 
@@ -2288,6 +2289,11 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
               <StatusPill status={activeOrder.status} />
             </View>
 
+            {/* Complete Live Route Map (Farm Gate -> Fleet Driver -> Buyer Doorstep) */}
+            <View style={{ borderRadius: 16, overflow: 'hidden' }}>
+              <OrderLiveRouteMap order={activeOrder} height={230} />
+            </View>
+
             {/* If Self-Pickup: Show Farmer Details, Location, Phone & Pickup PIN (Requirement 6) */}
             {isPickup && (
               <View
@@ -2472,6 +2478,71 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
                 })}
               </View>
             </View>
+
+            {/* Live Combined Activity Log (Farmer Preparation & Fleet Delivery) */}
+            {activeOrder.timeline && activeOrder.timeline.length > 0 && (
+              <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, gap: 10, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                    Live Activity & Handover History
+                  </Text>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#1F5C3A' }}>
+                    {activeOrder.timeline.length} updates recorded
+                  </Text>
+                </View>
+
+                <View style={{ gap: 8 }}>
+                  {activeOrder.timeline.map((event, eIdx) => {
+                    const isFarmerEvent = event.status === 'pending' || event.status === 'accepted' || event.status === 'preparing';
+
+                    return (
+                      <View
+                        key={eIdx}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'flex-start',
+                          gap: 10,
+                          paddingVertical: 6,
+                          borderBottomWidth: eIdx === activeOrder.timeline.length - 1 ? 0 : 1,
+                          borderBottomColor: '#F1F5F9',
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 26,
+                            height: 26,
+                            borderRadius: 13,
+                            backgroundColor: isFarmerEvent ? '#E6F2E8' : '#DBEAFE',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: 1,
+                          }}
+                        >
+                          <Text style={{ fontSize: 12 }}>
+                            {isFarmerEvent ? '🌾' : '🚚'}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A' }}>
+                              {event.label}
+                            </Text>
+                            <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '600' }}>
+                              {event.timestamp}
+                            </Text>
+                          </View>
+                          {Boolean(event.note) && (
+                            <Text style={{ fontSize: 11.5, color: '#475569', marginTop: 2 }}>
+                              {event.note}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
 
             {/* Order Items with Photos */}
             <View style={{ backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, gap: 8 }}>

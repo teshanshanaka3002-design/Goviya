@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, TextInput, Image, Linking } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput, Image, Linking, Modal } from 'react-native';
 import {
   Clock,
   CheckCircle2,
@@ -20,6 +20,8 @@ import {
   AlertCircle,
   Package,
   UserCheck,
+  X,
+  Navigation,
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { Card } from '../../components/ui/Card';
@@ -29,6 +31,7 @@ import { StatusPill } from '../../components/ui/StatusPill';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
+import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
 import { Order, OrderStatus } from '../../types';
 
 export const FarmerOrdersScreen: React.FC = () => {
@@ -48,6 +51,7 @@ export const FarmerOrdersScreen: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'preparing' | 'ready' | 'transit' | 'delivered'>('all');
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'all' | 'delivery' | 'pickup'>('all');
   const [viewScope, setViewScope] = useState<'current_farm' | 'all_farms'>('current_farm');
+  const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
 
   const currentFarmerId = currentUser?.role === 'farmer' ? currentUser._id : 'user_farmer_1';
   const currentFarmer = users.find(u => u._id === currentFarmerId) || currentUser;
@@ -474,12 +478,151 @@ export const FarmerOrdersScreen: React.FC = () => {
                       </Text>
                     </View>
                   )}
+
+                  {/* Live Route & Delivery Tracking Button */}
+                  <Pressable
+                    onPress={() => setTrackingOrder(order)}
+                    className="flex-row items-center justify-between p-2.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0] mt-1"
+                  >
+                    <View className="flex-row items-center gap-2">
+                      <Truck size={15} color="#166534" />
+                      <Text className="text-xs font-bold text-[#166534]">
+                        Live Route & Delivery Tracking
+                      </Text>
+                    </View>
+                    <Text className="text-[11px] font-extrabold text-[#166534]">
+                      {order.status === 'out_for_delivery'
+                        ? 'Live in Transit ↗'
+                        : order.status === 'ready_for_pickup'
+                        ? 'Driver Dispatched ↗'
+                        : 'View Route ↗'}
+                    </Text>
+                  </Pressable>
                 </Card>
               );
             })}
           </View>
         )}
       </View>
+
+      {/* Farmer Live Route & Dispatch Tracking Modal */}
+      {trackingOrder && (
+        <Modal visible={true} animationType="slide" transparent>
+          <View className="flex-1 bg-black/60 justify-end">
+            <View className="bg-white rounded-t-3xl max-h-[90%] p-4 gap-3.5">
+              {/* Header */}
+              <View className="flex-row items-center justify-between border-b border-[#F0F0EE] pb-2.5">
+                <View>
+                  <Text className="text-sm font-black text-[#1A1A1A]">
+                    Live Route & Dispatch Tracking
+                  </Text>
+                  <Text className="text-[11px] text-[#6B7280]">
+                    {trackingOrder.orderNumber} · {trackingOrder.farmerName} → {trackingOrder.buyerName}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setTrackingOrder(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 items-center justify-center"
+                >
+                  <X size={18} color="#6B7280" />
+                </Pressable>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingBottom: 30 }}>
+                {/* Complete Live Route Map */}
+                <View className="rounded-2xl overflow-hidden">
+                  <OrderLiveRouteMap order={trackingOrder} height={230} />
+                </View>
+
+                {/* Fleet Driver Live Status Card */}
+                <View className="p-3 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] gap-2">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-2">
+                      <Truck size={16} color="#1D4ED8" />
+                      <Text className="text-xs font-bold text-[#1E3A8A]">
+                        Logistics Driver Dispatch
+                      </Text>
+                    </View>
+                    <StatusPill status={trackingOrder.status} />
+                  </View>
+
+                  {trackingOrder.driverName ? (
+                    <View className="flex-row items-center justify-between pt-1">
+                      <View>
+                        <Text className="text-xs font-black text-[#1A1A1A]">
+                          {trackingOrder.driverName}
+                        </Text>
+                        <Text className="text-[11px] text-[#6B7280]">
+                          {trackingOrder.driverVehicle || 'Light Truck'}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => Linking.openURL(`tel:${trackingOrder.driverPhone || '+94782345678'}`)}
+                        className="flex-row items-center gap-1 bg-[#1D4ED8] px-3 py-1.5 rounded-xl"
+                      >
+                        <Phone size={12} color="#FFFFFF" />
+                        <Text className="text-xs font-bold text-white">Call Driver</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <Text className="text-xs text-[#1E3A8A]">
+                      Order broadcasted to nearby fleet drivers. Awaiting driver assignment.
+                    </Text>
+                  )}
+                </View>
+
+                {/* Buyer Destination Info */}
+                <View className="p-3 rounded-xl bg-slate-50 border border-slate-200 gap-1.5">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-xs font-bold text-[#1A1A1A]">
+                      Destination: {trackingOrder.buyerName}
+                    </Text>
+                    <Pressable
+                      onPress={() => Linking.openURL(`tel:${trackingOrder.buyerPhone}`)}
+                      className="flex-row items-center gap-1 bg-slate-200 px-2.5 py-1 rounded-lg"
+                    >
+                      <Phone size={11} color="#1A1A1A" />
+                      <Text className="text-[11px] font-bold text-[#1A1A1A]">Call Buyer</Text>
+                    </Pressable>
+                  </View>
+                  <Text className="text-xs text-[#4B5563]">
+                    {trackingOrder.deliveryAddress} ({trackingOrder.deliveryDistrict})
+                  </Text>
+                </View>
+
+                {/* Full Dispatch & Preparation Chronological Log */}
+                {trackingOrder.timeline && trackingOrder.timeline.length > 0 && (
+                  <View className="p-3 rounded-xl bg-white border border-[#E5E7EB] gap-2">
+                    <Text className="text-xs font-black text-[#1A1A1A] uppercase tracking-wide">
+                      Live Dispatch Timeline ({trackingOrder.timeline.length} updates)
+                    </Text>
+
+                    <View className="gap-2 pt-1">
+                      {trackingOrder.timeline.map((evt, idx) => {
+                        const isFarmer = evt.status === 'pending' || evt.status === 'accepted' || evt.status === 'preparing';
+                        return (
+                          <View key={idx} className="flex-row items-start gap-2.5 border-b border-[#F0F0EE] pb-2 last:border-b-0">
+                            <Text className="text-xs">{isFarmer ? '🌾' : '🚚'}</Text>
+                            <View className="flex-1">
+                              <View className="flex-row items-center justify-between">
+                                <Text className="text-xs font-bold text-[#1A1A1A]">{evt.label}</Text>
+                                <Text className="text-[10px] text-[#6B7280]">{evt.timestamp}</Text>
+                              </View>
+                              {Boolean(evt.note) && (
+                                <Text className="text-[11px] text-[#4B5563] mt-0.5">{evt.note}</Text>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 };
