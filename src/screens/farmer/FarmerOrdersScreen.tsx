@@ -131,13 +131,28 @@ export const FarmerOrdersScreen: React.FC = () => {
             {filteredOrders.map(order => (
               <Card key={order._id} padding="md" style={{ gap: 12 }}>
                 <View className="flex-row items-center justify-between border-b border-[#F0F0EE] pb-2">
-                  <View>
+                  <View className="flex-1 mr-2">
                     <Text className="text-xs font-bold text-[#1A1A1A]">{order.orderNumber}</Text>
                     <Text className="text-[10px] text-[#6B7280]">
                       Buyer: {order.buyerName} ({order.buyerPhone})
                     </Text>
                   </View>
-                  <StatusPill status={order.status} />
+                  <View className="flex-row items-center gap-1.5">
+                    <Pressable
+                      onPress={() => {
+                        const convId = getOrCreateConversation(order.buyerId, order.buyerName, order.items[0]?.cropName || 'Order', 'buyer');
+                        goToSubScreen('chat_detail', { conversationId: convId });
+                      }}
+                      style={({ pressed }) => [
+                        { paddingHorizontal: 8, paddingVertical: 4.5, borderRadius: 8, backgroundColor: '#E6F2E8', flexDirection: 'row', alignItems: 'center', gap: 4 },
+                        pressed && { opacity: 0.75 },
+                      ]}
+                    >
+                      <MessageSquare size={12} color="#1F5C3A" />
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#1F5C3A' }}>Chat</Text>
+                    </Pressable>
+                    <StatusPill status={order.status} />
+                  </View>
                 </View>
 
                 {order.items.map((item, idx) => (
@@ -156,14 +171,16 @@ export const FarmerOrdersScreen: React.FC = () => {
                   <View className="flex-row gap-2 pt-2 border-t border-[#F0F0EE]">
                     <Button
                       variant="outline"
-                      className="flex-1"
+                      size="sm"
+                      style={{ flex: 1 }}
                       onPress={() => farmerRejectOrder(order._id, 'Out of stock')}
                     >
                       Decline
                     </Button>
                     <Button
                       variant="primary"
-                      className="flex-1"
+                      size="sm"
+                      style={{ flex: 1 }}
                       onPress={() => farmerAcceptOrder(order._id)}
                     >
                       Accept Order

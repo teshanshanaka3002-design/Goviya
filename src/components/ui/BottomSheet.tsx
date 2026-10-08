@@ -1,6 +1,7 @@
 import React from 'react';
-import { Modal, View, Text, Pressable, ScrollView } from 'react-native';
+import { Modal, View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface BottomSheetProps {
   isOpen: boolean;
@@ -8,7 +9,7 @@ export interface BottomSheetProps {
   title?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  maxHeight?: string;
+  maxHeight?: number | string;
 }
 
 export const BottomSheet: React.FC<BottomSheetProps> = ({
@@ -17,7 +18,10 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   title,
   children,
   footer,
+  maxHeight = '90%',
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
     <Modal
       visible={isOpen}
@@ -25,36 +29,54 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 justify-end bg-black/60">
-        <Pressable className="flex-1" onPress={onClose} />
-        
-        <View className="w-full max-h-[88%] bg-white rounded-t-3xl overflow-hidden flex-col shadow-2xl">
+      <View style={sheetStyles.overlay}>
+        <Pressable style={sheetStyles.backdrop} onPress={onClose} />
+
+        <View style={[sheetStyles.sheetContainer, { maxHeight: (maxHeight as any) }]}>
           {/* Grab Handle */}
-          <View className="pt-2.5 pb-1 items-center shrink-0">
-            <View className="w-10 h-1 bg-[#D1D5DB] rounded-full" />
+          <View style={sheetStyles.handleContainer}>
+            <View style={sheetStyles.handle} />
           </View>
 
           {/* Header */}
-          {title && (
-            <View className="flex-row items-center justify-between px-4 py-2.5 border-b border-[#E5E5E5] shrink-0">
-              <Text className="text-sm font-bold text-[#1A1A1A] flex-1 mr-2">{title}</Text>
+          {Boolean(title) && (
+            <View style={sheetStyles.header}>
+              <Text style={sheetStyles.title} numberOfLines={1}>
+                {title}
+              </Text>
               <Pressable
                 onPress={onClose}
-                className="p-1.5 rounded-full bg-slate-100"
+                style={({ pressed }) => [
+                  sheetStyles.closeBtn,
+                  pressed && { opacity: 0.7, backgroundColor: '#E2E8F0' },
+                ]}
               >
-                <X size={16} color="#6B7280" />
+                <X size={17} color="#4B5563" strokeWidth={2.2} />
               </Pressable>
             </View>
           )}
 
           {/* Scrollable Content */}
-          <ScrollView className="px-4 py-3 flex-1" contentContainerStyle={{ paddingBottom: 16 }}>
+          <ScrollView
+            style={sheetStyles.scrollContent}
+            contentContainerStyle={{
+              paddingHorizontal: 16,
+              paddingTop: 12,
+              paddingBottom: footer ? 16 : Math.max(insets.bottom, 20),
+            }}
+            showsVerticalScrollIndicator={false}
+          >
             {children}
           </ScrollView>
 
-          {/* Sticky Action Footer */}
+          {/* Sticky Action Footer with Safe Area */}
           {footer && (
-            <View className="p-3.5 pb-8 bg-white border-t border-[#E5E5E5] shrink-0 z-20">
+            <View
+              style={[
+                sheetStyles.footer,
+                { paddingBottom: Math.max(insets.bottom, 16) },
+              ]}
+            >
               {footer}
             </View>
           )}
@@ -63,3 +85,71 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
     </Modal>
   );
 };
+
+const sheetStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+  },
+  backdrop: {
+    flex: 1,
+  },
+  sheetContainer: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  handleContainer: {
+    paddingTop: 10,
+    paddingBottom: 6,
+    alignItems: 'center',
+  },
+  handle: {
+    width: 44,
+    height: 4,
+    backgroundColor: '#CBD5E1',
+    borderRadius: 99,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    flex: 1,
+    marginRight: 10,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    flexShrink: 1,
+  },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+});

@@ -58,6 +58,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     admin: { label: 'Admin', bg: 'bg-[#F3E8FF]', text: 'text-[#7C3AED]' },
   };
 
+  const subScreenTitles: Record<string, string> = {
+    product_detail: 'Crop Details',
+    cart: 'Shopping Cart',
+    checkout: 'Checkout & Delivery',
+    order_confirmation: 'Order Confirmed',
+    order_tracking: 'Live Delivery Tracking',
+    my_orders: 'My Orders',
+    chat_list: 'Messages',
+    chat_detail: 'Direct Chat',
+    market_prices: 'Official Mandi Rates',
+    nearby_map: 'Nearby Producers Map',
+    add_listing: 'Post New Harvest',
+  };
+
+  const effectiveTitle =
+    title || (navState.subScreen ? subScreenTitles[navState.subScreen] || '' : '');
+
   const handleBack = () => {
     if (onBack) {
       onBack();
@@ -76,7 +93,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           {showBack || navState.subScreen ? (
             <Pressable
               onPress={handleBack}
-              style={{ padding: 6, marginLeft: -4, borderRadius: 10, backgroundColor: '#F1F5F9' }}
+              style={({ pressed }) => [
+                { padding: 6, marginLeft: -4, borderRadius: 10, backgroundColor: '#F1F5F9' },
+                pressed && { opacity: 0.75, backgroundColor: '#E2E8F0' },
+              ]}
             >
               <ChevronLeft size={20} color="#1A1A1A" strokeWidth={2.5} />
             </Pressable>
@@ -94,11 +114,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </View>
           )}
 
-          {title && (
-            <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1A1A', flex: 1, marginLeft: 4 }} numberOfLines={1}>
-              {title}
+          {effectiveTitle ? (
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1A1A1A', flex: 1, marginLeft: 2 }} numberOfLines={1}>
+              {effectiveTitle}
             </Text>
-          )}
+          ) : null}
         </View>
 
         {/* Right Slot */}
@@ -110,7 +130,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               {!currentUser && !navState.subScreen && (
                 <Pressable
                   onPress={() => openAuth('buyer')}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4.5, borderRadius: 16, backgroundColor: '#1F5C3A' }}
+                  style={({ pressed }) => [
+                    { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16, backgroundColor: '#1F5C3A' },
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                  ]}
                 >
                   <LogIn size={11} color="#ffffff" />
                   <Text style={{ fontSize: 11, fontWeight: '700', color: '#ffffff' }}>Sign In</Text>
@@ -120,6 +143,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               {/* Role Switcher Pill */}
               <Pressable
                 onPress={() => setShowRoleMenu(true)}
+                style={({ pressed }) => [
+                  pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+                ]}
                 className={`flex-row items-center gap-1 px-2.5 py-1 rounded-full border border-black/5 ${currentBadge.bg}`}
               >
                 <Shuffle size={11} color={currentRole === 'farmer' ? '#B45309' : currentRole === 'driver' ? '#19768A' : currentRole === 'admin' ? '#7C3AED' : '#1F5C3A'} />
@@ -132,7 +158,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               {currentRole === 'buyer' && !navState.subScreen && (
                 <Pressable
                   onPress={() => setTab('cart')}
-                  style={{ position: 'relative', padding: 6, borderRadius: 10 }}
+                  style={({ pressed }) => [
+                    { position: 'relative', padding: 6, borderRadius: 10 },
+                    pressed && { opacity: 0.75, backgroundColor: '#F1F5F9' },
+                  ]}
                 >
                   <ShoppingCart size={19} color="#1F5C3A" />
                   {cart.length > 0 && (
@@ -171,9 +200,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 switchRole('buyer');
                 setShowRoleMenu(false);
               }}
-              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
-                currentRole === 'buyer' ? 'bg-[#E6F2E8]' : 'bg-slate-50'
-              }`}
+              style={({ pressed }) => [
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, marginBottom: 6 },
+                currentRole === 'buyer' ? { backgroundColor: '#E6F2E8' } : { backgroundColor: '#F8FAFC' },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
             >
               <Text className="text-xs font-medium text-[#374151]">🛒 Buyer (No login needed)</Text>
               {currentRole === 'buyer' && <Check size={14} color="#1F5C3A" />}
@@ -185,9 +216,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 switchRole('farmer');
                 setShowRoleMenu(false);
               }}
-              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
-                currentRole === 'farmer' ? 'bg-[#FEF8EA]' : 'bg-slate-50'
-              }`}
+              style={({ pressed }) => [
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, marginBottom: 6 },
+                currentRole === 'farmer' ? { backgroundColor: '#FEF8EA' } : { backgroundColor: '#F8FAFC' },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
             >
               <Text className="text-xs font-medium text-[#374151]">🌱 Farmer Dashboard</Text>
               {currentUser?.role === 'farmer' ? (
@@ -203,9 +236,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 switchRole('driver');
                 setShowRoleMenu(false);
               }}
-              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
-                currentRole === 'driver' ? 'bg-[#EEF8FA]' : 'bg-slate-50'
-              }`}
+              style={({ pressed }) => [
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, marginBottom: 6 },
+                currentRole === 'driver' ? { backgroundColor: '#EEF8FA' } : { backgroundColor: '#F8FAFC' },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
             >
               <Text className="text-xs font-medium text-[#374151]">🚚 Driver Logistics</Text>
               {currentUser?.role === 'driver' ? (
@@ -221,9 +256,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 switchRole('admin');
                 setShowRoleMenu(false);
               }}
-              className={`flex-row items-center justify-between p-3 rounded-xl mb-1.5 ${
-                currentRole === 'admin' ? 'bg-[#F3E8FF]' : 'bg-slate-50'
-              }`}
+              style={({ pressed }) => [
+                { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, marginBottom: 6 },
+                currentRole === 'admin' ? { backgroundColor: '#F3E8FF' } : { backgroundColor: '#F8FAFC' },
+                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+              ]}
             >
               <Text className="text-xs font-medium text-[#374151]">🛡️ Platform Admin</Text>
               {currentUser?.role === 'admin' ? (

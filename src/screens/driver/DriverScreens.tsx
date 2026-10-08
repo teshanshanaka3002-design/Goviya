@@ -117,7 +117,7 @@ export const DriverHomeScreen: React.FC = () => {
             assignedDeliveries.map(order => (
               <Card key={order._id} padding="md" style={{ gap: 12 }}>
                 <View className="flex-row items-center justify-between border-b border-[#F0F0EE] pb-2">
-                  <View>
+                  <View className="flex-1 mr-2">
                     <Text className="text-xs font-bold text-[#1A1A1A]">{order.orderNumber}</Text>
                     <Text className="text-[10px] text-[#6B7280]">
                       Pickup: {order.farmerName} ({order.farmerAddress})
@@ -126,16 +126,58 @@ export const DriverHomeScreen: React.FC = () => {
                   <StatusPill status={order.status} />
                 </View>
 
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-xs text-[#6B7280]">Destination:</Text>
-                  <Text className="text-xs font-bold text-[#1A1A1A]">{order.deliveryAddress}</Text>
+                <View style={{ gap: 4 }}>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-xs text-[#6B7280]">Destination:</Text>
+                    <Text className="text-xs font-bold text-[#1A1A1A] flex-1 text-right ml-2" numberOfLines={1}>
+                      {order.deliveryAddress}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-xs text-[#6B7280]">Recipient:</Text>
+                    <Text className="text-xs font-bold text-[#1F5C3A]">
+                      {order.buyerName} ({order.buyerPhone})
+                    </Text>
+                  </View>
                 </View>
+
+                {/* Driver Communication Shortcuts */}
+                <View className="flex-row gap-2 pt-1 border-t border-[#F0F0EE]">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    style={{ flex: 1 }}
+                    leftIcon={<Phone size={13} color="#1F5C3A" />}
+                    onPress={() => Linking.openURL(`tel:${order.farmerPhone || '+94771234567'}`)}
+                  >
+                    Call Farmer
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    style={{ flex: 1 }}
+                    leftIcon={<Phone size={13} color="#1F5C3A" />}
+                    onPress={() => Linking.openURL(`tel:${order.buyerPhone || '+94771234567'}`)}
+                  >
+                    Call Buyer
+                  </Button>
+                </View>
+
+                {/* Dispatch Status Actions */}
+                {order.status === 'preparing' && (
+                  <View className="p-2.5 bg-[#FEF8EA] rounded-xl border border-[#FDE6B8]">
+                    <Text className="text-xs text-[#92400E] font-medium text-center">
+                      Farmer is harvesting & packing at farm gate. Pickup opens once ready.
+                    </Text>
+                  </View>
+                )}
 
                 {order.status === 'ready_for_pickup' && (
                   <Button
                     variant="primary"
                     fullWidth
-                    size="sm"
+                    size="md"
+                    leftIcon={<Check size={16} color="#ffffff" strokeWidth={2.5} />}
                     onPress={() => driverConfirmPickup(order._id)}
                   >
                     Confirm Pickup at Farm Gate
@@ -146,7 +188,8 @@ export const DriverHomeScreen: React.FC = () => {
                   <Button
                     variant="primary"
                     fullWidth
-                    size="sm"
+                    size="md"
+                    leftIcon={<CheckCircle size={16} color="#ffffff" strokeWidth={2.5} />}
                     onPress={() => driverConfirmDelivery(order._id, 'Handed over to recipient')}
                   >
                     Confirm Doorstep Handover

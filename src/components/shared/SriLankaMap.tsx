@@ -95,7 +95,7 @@ export const SriLankaMap: React.FC<SriLankaMapProps> = ({
         <Text style={styles.compassText}>Sri Lanka Agri GPS</Text>
       </View>
 
-      {routeTitle && (
+      {Boolean(routeTitle) && (
         <View style={styles.routeBadge}>
           <Navigation size={12} color="#ffffff" />
           <Text style={styles.routeText}>{routeTitle}</Text>

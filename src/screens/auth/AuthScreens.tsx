@@ -189,7 +189,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </Text>
         </View>
 
-        <View className="w-full space-y-3 pb-6">
+        <View className="w-full pb-6" style={{ gap: 12 }}>
           <Button
             variant="secondary"
             fullWidth
@@ -240,8 +240,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </Text>
         </View>
 
-        <View className="space-y-6 pb-6">
-          <View className="flex-row justify-center gap-1.5 mb-4">
+        <View className="pb-6" style={{ gap: 16 }}>
+          <View className="flex-row justify-center gap-1.5 mb-2">
             {onboardingSlides.map((_, i) => (
               <View
                 key={i}
@@ -256,7 +256,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             {onboardingStep > 0 && (
               <Button
                 variant="outline"
-                className="flex-1"
+                style={{ flex: 1 }}
+                size="md"
                 onPress={() => setOnboardingStep(prev => prev - 1)}
               >
                 Back
@@ -264,7 +265,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             )}
             <Button
               variant="primary"
-              className="flex-1"
+              style={{ flex: 1 }}
+              size="md"
               rightIcon={<ArrowRight size={16} color="#ffffff" />}
               onPress={() => {
                 if (onboardingStep < onboardingSlides.length - 1) {
@@ -278,7 +280,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </Button>
           </View>
 
-          <Pressable onPress={continueAsGuest} className="items-center mt-3">
+          <Pressable onPress={continueAsGuest} className="items-center mt-1">
             <Text className="text-xs text-[#1F5C3A] font-semibold">
               Skip & browse marketplace as guest
             </Text>
@@ -290,7 +292,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
   return (
     <ScrollView className="flex-1 bg-[#F6F7F5] px-4 py-6" contentContainerStyle={{ paddingBottom: 40 }}>
-      <View className="max-w-md w-full mx-auto space-y-4">
+      <View className="max-w-md w-full mx-auto" style={{ gap: 16 }}>
         {/* Top Guest Navigation Header Bar */}
         <View className="flex-row items-center justify-between pb-1">
           <Pressable
@@ -354,8 +356,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <View className="flex-row flex-wrap gap-2">
             <Pressable
               onPress={() => loginAsRole('buyer')}
+              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
               className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-              style={{ width: '48%' }}
             >
               <Text className="text-base">🛒</Text>
               <View className="flex-1">
@@ -366,8 +368,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             <Pressable
               onPress={() => loginAsRole('farmer')}
+              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
               className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-              style={{ width: '48%' }}
             >
               <Text className="text-base">🌱</Text>
               <View className="flex-1">
@@ -378,8 +380,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             <Pressable
               onPress={() => loginAsRole('driver')}
+              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
               className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-              style={{ width: '48%' }}
             >
               <Text className="text-base">🚚</Text>
               <View className="flex-1">
@@ -390,8 +392,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             <Pressable
               onPress={() => loginAsRole('admin')}
+              style={({ pressed }) => [{ width: '48%' }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}
               className="flex-row items-center gap-2 p-2.5 bg-white rounded-xl border border-[#D5EAD8]"
-              style={{ width: '48%' }}
             >
               <Text className="text-base">🛡️</Text>
               <View className="flex-1">
@@ -433,7 +435,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         </View>
 
         {/* Error Notice */}
-        {formError && (
+        {Boolean(formError) && (
           <View className="p-3 bg-[#FEF2F2] border border-[#FECACA] rounded-xl flex-row items-center gap-2">
             <AlertCircle size={16} color="#DC2626" />
             <Text className="text-xs text-[#DC2626] flex-1">{formError}</Text>
@@ -443,7 +445,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         {/* Regular Sign-In / Register Form Card */}
         <Card variant="default" padding="lg">
           {view === 'login' ? (
-            <View className="space-y-4">
+            <View style={{ gap: 16 }}>
               <View>
                 <Text className="text-base font-bold text-[#1A1A1A]">Account Sign In</Text>
                 <Text className="text-xs text-[#6B7280] mt-0.5">
@@ -459,32 +461,35 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <View className="flex-row gap-2">
                   <Pressable
                     onPress={() => setLoginRole('buyer')}
-                    className={`flex-1 py-2 rounded-xl border items-center ${
+                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                    className={`flex-1 py-2.5 min-h-[50px] justify-center rounded-xl border items-center ${
                       loginRole === 'buyer' ? 'border-[#1F5C3A] bg-[#E6F2E8]' : 'border-[#E5E5E5] bg-white'
                     }`}
                   >
                     <Text className="text-base">🛒</Text>
-                    <Text className="text-[11px] font-bold text-[#1F5C3A]">Buyer</Text>
+                    <Text className="text-[11px] font-bold text-[#1F5C3A] mt-0.5">Buyer</Text>
                   </Pressable>
 
                   <Pressable
                     onPress={() => setLoginRole('farmer')}
-                    className={`flex-1 py-2 rounded-xl border items-center ${
+                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                    className={`flex-1 py-2.5 min-h-[50px] justify-center rounded-xl border items-center ${
                       loginRole === 'farmer' ? 'border-[#B45309] bg-[#FEF8EA]' : 'border-[#E5E5E5] bg-white'
                     }`}
                   >
                     <Text className="text-base">🌱</Text>
-                    <Text className="text-[11px] font-bold text-[#B45309]">Farmer</Text>
+                    <Text className="text-[11px] font-bold text-[#B45309] mt-0.5">Farmer</Text>
                   </Pressable>
 
                   <Pressable
                     onPress={() => setLoginRole('driver')}
-                    className={`flex-1 py-2 rounded-xl border items-center ${
+                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                    className={`flex-1 py-2.5 min-h-[50px] justify-center rounded-xl border items-center ${
                       loginRole === 'driver' ? 'border-[#19768A] bg-[#EEF8FA]' : 'border-[#E5E5E5] bg-white'
                     }`}
                   >
                     <Text className="text-base">🚚</Text>
-                    <Text className="text-[11px] font-bold text-[#19768A]">Driver</Text>
+                    <Text className="text-[11px] font-bold text-[#19768A] mt-0.5">Driver</Text>
                   </Pressable>
                 </View>
               </View>
@@ -510,13 +515,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <Button
                 variant="primary"
                 fullWidth
-                size="md"
+                size="lg"
                 onPress={handleLoginSubmit}
               >
-                Sign In as {loginRole === 'buyer' ? 'Buyer' : loginRole === 'farmer' ? 'Farmer' : 'Logistics Driver'}
+                {`Sign In as ${loginRole === 'buyer' ? 'Buyer' : loginRole === 'farmer' ? 'Farmer' : 'Logistics Driver'}`}
               </Button>
 
-              <View className="pt-2 items-center space-y-2">
+              <View className="pt-2 items-center" style={{ gap: 8 }}>
                 <Pressable onPress={() => setView('register')}>
                   <Text className="text-xs text-[#1F5C3A] font-semibold text-center">
                     New to Goviya? Create account as Buyer, Farmer or Driver
@@ -530,7 +535,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               </View>
             </View>
           ) : (
-            <View className="space-y-4">
+            <View style={{ gap: 16 }}>
               <View>
                 <Text className="text-base font-bold text-[#1A1A1A]">Register New Account</Text>
                 <Text className="text-xs text-[#6B7280] mt-0.5">
@@ -546,7 +551,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <View className="flex-row gap-2">
                   <Pressable
                     onPress={() => setRegisterRole('buyer')}
-                    className={`flex-1 p-2.5 rounded-xl border items-center ${
+                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                    className={`flex-1 p-2.5 min-h-[54px] justify-center rounded-xl border items-center ${
                       registerRole === 'buyer' ? 'border-[#1F5C3A] bg-[#E6F2E8]' : 'border-[#E5E5E5] bg-white'
                     }`}
                   >
@@ -556,7 +562,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
                   <Pressable
                     onPress={() => setRegisterRole('farmer')}
-                    className={`flex-1 p-2.5 rounded-xl border items-center ${
+                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                    className={`flex-1 p-2.5 min-h-[54px] justify-center rounded-xl border items-center ${
                       registerRole === 'farmer' ? 'border-[#B45309] bg-[#FEF8EA]' : 'border-[#E5E5E5] bg-white'
                     }`}
                   >
@@ -566,7 +573,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
                   <Pressable
                     onPress={() => setRegisterRole('driver')}
-                    className={`flex-1 p-2.5 rounded-xl border items-center ${
+                    style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+                    className={`flex-1 p-2.5 min-h-[54px] justify-center rounded-xl border items-center ${
                       registerRole === 'driver' ? 'border-[#19768A] bg-[#EEF8FA]' : 'border-[#E5E5E5] bg-white'
                     }`}
                   >
@@ -594,7 +602,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               />
 
               {registerRole === 'farmer' && (
-                <View className="space-y-3 p-3 bg-[#FEF8EA] rounded-xl border border-[#FDE6B8]">
+                <View className="p-3 bg-[#FEF8EA] rounded-xl border border-[#FDE6B8]" style={{ gap: 12 }}>
                   <Text className="text-[11px] font-bold text-[#B45309] uppercase">
                     Producer Farm Details
                   </Text>
@@ -615,7 +623,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               )}
 
               {registerRole === 'driver' && (
-                <View className="space-y-3 p-3 bg-[#EEF8FA] rounded-xl border border-[#D0EEF5]">
+                <View className="p-3 bg-[#EEF8FA] rounded-xl border border-[#D0EEF5]" style={{ gap: 12 }}>
                   <Text className="text-[11px] font-bold text-[#19768A] uppercase">
                     Fleet Vehicle Details
                   </Text>
@@ -640,13 +648,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <Button
                 variant="primary"
                 fullWidth
-                size="md"
+                size="lg"
                 onPress={handleRegisterSubmit}
               >
-                Register as {registerRole === 'farmer' ? 'Farmer' : registerRole === 'driver' ? 'Logistics Driver' : 'Buyer'}
+                {`Register as ${registerRole === 'farmer' ? 'Farmer' : registerRole === 'driver' ? 'Logistics Driver' : 'Buyer'}`}
               </Button>
 
-              <View className="pt-1 items-center space-y-1.5">
+              <View className="pt-1 items-center" style={{ gap: 6 }}>
                 <Pressable onPress={() => setView('login')}>
                   <Text className="text-xs text-[#1F5C3A] font-semibold text-center">
                     Already registered? Back to Sign In

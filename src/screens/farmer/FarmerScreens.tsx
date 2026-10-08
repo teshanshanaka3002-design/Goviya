@@ -225,9 +225,289 @@ export const FarmerListingsScreen: React.FC = () => {
   );
 };
 
+// ===================== 3. FARMER ADD LISTING SCREEN =====================
+export const FarmerAddListingScreen: React.FC = () => {
+  const { currentUser, addListing, setTab, goToSubScreen } = useApp();
+
+  const [cropName, setCropName] = useState('Carrots');
+  const [category, setCategory] = useState<'Vegetables' | 'Fruits' | 'Spices & Herbs' | 'Grains & Rice' | 'Tubers'>('Vegetables');
+  const [quantityKg, setQuantityKg] = useState('250');
+  const [minOrderKg, setMinOrderKg] = useState('10');
+  const [pricePerKg, setPricePerKg] = useState('320');
+  const [description, setDescription] = useState(
+    'Freshly harvested highland grade produce. Graded for wholesale quality and packed in ventilated crates.'
+  );
+  const [isOrganic, setIsOrganic] = useState(true);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const cropPresets = ['Carrots', 'Tomatoes', 'Potatoes', 'Red Onions', 'Leeks', 'Cabbage', 'Green Chillies'];
+  const categories: Array<'Vegetables' | 'Fruits' | 'Spices & Herbs' | 'Grains & Rice' | 'Tubers'> = [
+    'Vegetables',
+    'Fruits',
+    'Spices & Herbs',
+    'Grains & Rice',
+    'Tubers',
+  ];
+
+  const handleSubmit = () => {
+    if (!cropName.trim()) {
+      setErrorMsg('Please specify the crop name');
+      return;
+    }
+    const q = parseFloat(quantityKg);
+    const p = parseFloat(pricePerKg);
+    const m = parseFloat(minOrderKg);
+
+    if (isNaN(q) || q <= 0) {
+      setErrorMsg('Please enter a valid stock quantity in kg');
+      return;
+    }
+    if (isNaN(p) || p <= 0) {
+      setErrorMsg('Please enter a valid wholesale price per kg');
+      return;
+    }
+
+    addListing({
+      cropName: cropName.trim(),
+      category,
+      quantityKg: q,
+      minOrderKg: isNaN(m) || m <= 0 ? 5 : m,
+      pricePerKg: p,
+      harvestDate: new Date().toISOString().split('T')[0],
+      photos: [HARVEST_PHOTO_PRESETS[selectedPhotoIndex]?.url || ''],
+      description: description.trim(),
+      status: 'active',
+      location: {
+        lat: currentUser?.location?.lat || 6.9697,
+        lng: currentUser?.location?.lng || 80.7891,
+        district: currentUser?.location?.district || 'Nuwara Eliya',
+        town: currentUser?.location?.town || 'Kandapola',
+      },
+      isOrganic,
+    });
+
+    setTab('listings');
+    goToSubScreen(null);
+  };
+
+  return (
+    <ScrollView className="flex-1 bg-[#F6F7F5] p-4" contentContainerStyle={{ paddingBottom: 50 }}>
+      <View style={{ gap: 16 }}>
+        <View className="flex-row items-center justify-between">
+          <View>
+            <Text className="text-lg font-extrabold text-[#1A1A1A]">Post New Harvest Yield</Text>
+            <Text className="text-xs text-[#6B7280]">
+              Direct farm-gate listing connecting buyers and bulk logistics
+            </Text>
+          </View>
+        </View>
+
+        {Boolean(errorMsg) && (
+          <View className="p-3 bg-red-50 border border-red-200 rounded-xl flex-row items-center gap-2">
+            <AlertCircle size={16} color="#DC2626" />
+            <Text className="text-xs text-[#DC2626] font-semibold flex-1">{errorMsg}</Text>
+          </View>
+        )}
+
+        <Card padding="md" style={{ gap: 14 }}>
+          {/* Preset Crop Chips */}
+          <View>
+            <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider mb-2">
+              Select Crop
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
+              {cropPresets.map(preset => (
+                <Pressable
+                  key={preset}
+                  onPress={() => setCropName(preset)}
+                  style={({ pressed }) => [
+                    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+                    cropName === preset
+                      ? { backgroundColor: '#1F5C3A', borderColor: '#1F5C3A' }
+                      : { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: cropName === preset ? '#FFFFFF' : '#334155',
+                    }}
+                  >
+                    {preset}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <Input
+            label="Crop Name / Variety"
+            value={cropName}
+            onChangeText={setCropName}
+            placeholder="e.g. Nuwara Eliya Fresh Carrots"
+          />
+
+          {/* Category Chips */}
+          <View>
+            <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider mb-2">
+              Category
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
+              {categories.map(cat => (
+                <Pressable
+                  key={cat}
+                  onPress={() => setCategory(cat)}
+                  style={({ pressed }) => [
+                    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+                    category === cat
+                      ? { backgroundColor: '#1F5C3A', borderColor: '#1F5C3A' }
+                      : { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '700',
+                      color: category === cat ? '#FFFFFF' : '#334155',
+                    }}
+                  >
+                    {cat}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Numeric Fields Row */}
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              <Input
+                label="Available Stock (kg)"
+                keyboardType="numeric"
+                value={quantityKg}
+                onChangeText={setQuantityKg}
+                placeholder="250"
+              />
+            </View>
+            <View className="flex-1">
+              <Input
+                label="Min Order (kg)"
+                keyboardType="numeric"
+                value={minOrderKg}
+                onChangeText={setMinOrderKg}
+                placeholder="10"
+              />
+            </View>
+          </View>
+
+          <Input
+            label="Farm Gate Wholesale Price (LKR / kg)"
+            keyboardType="numeric"
+            value={pricePerKg}
+            onChangeText={setPricePerKg}
+            placeholder="320"
+          />
+
+          {/* Organic Cultivation Toggle */}
+          <Pressable
+            onPress={() => setIsOrganic(!isOrganic)}
+            style={({ pressed }) => [
+              { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, borderRadius: 12, borderWidth: 1 },
+              isOrganic ? { backgroundColor: '#E6F2E8', borderColor: '#CDE5D2' } : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <View className="flex-1 mr-2">
+              <Text className="text-xs font-bold text-[#1F5C3A]">Certified Organic / Eco-Grown</Text>
+              <Text className="text-[10px] text-[#4B6B56]">Cultivated without synthetic pesticides or chemical fertilizers</Text>
+            </View>
+            <View
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                backgroundColor: isOrganic ? '#1F5C3A' : '#E2E8F0',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {isOrganic && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+            </View>
+          </Pressable>
+
+          {/* Preset Photo Selector */}
+          <View>
+            <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider mb-2">
+              Harvest Verification Photo
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, flexDirection: 'row' }}>
+              {HARVEST_PHOTO_PRESETS.map((preset, idx) => (
+                <Pressable
+                  key={idx}
+                  onPress={() => setSelectedPhotoIndex(idx)}
+                  style={({ pressed }) => [
+                    { width: 80, height: 80, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
+                    selectedPhotoIndex === idx ? { borderColor: '#1F5C3A' } : { borderColor: '#E2E8F0' },
+                    pressed && { opacity: 0.8 },
+                  ]}
+                >
+                  <Image source={{ uri: preset.url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                  {selectedPhotoIndex === idx && (
+                    <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#1F5C3A', borderRadius: 10, padding: 2 }}>
+                      <Check size={10} color="#FFFFFF" strokeWidth={3} />
+                    </View>
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <Input
+            label="Harvest Quality Notes"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Harvest time, grading standards, and packing..."
+            multiline
+            numberOfLines={2}
+          />
+        </Card>
+
+        {/* Action Buttons */}
+        <View className="flex-row gap-3 pt-2">
+          <Button
+            variant="outline"
+            size="lg"
+            style={{ flex: 1 }}
+            onPress={() => goToSubScreen(null)}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            style={{ flex: 2 }}
+            leftIcon={<Plus size={18} color="#ffffff" />}
+            onPress={handleSubmit}
+          >
+            Publish Harvest
+          </Button>
+        </View>
+      </View>
+    </ScrollView>
+  );
+};
+
 // Main Farmer Screens Router Container
 export const FarmerScreens: React.FC = () => {
   const { navState } = useApp();
+
+  if (navState.subScreen === 'add_listing') {
+    return <FarmerAddListingScreen />;
+  }
 
   if (navState.activeTab === 'orders') return <FarmerOrdersScreen />;
   if (navState.activeTab === 'listings') return <FarmerListingsScreen />;

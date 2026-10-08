@@ -122,19 +122,20 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
             <Button
               variant="primary"
               size="md"
-              className="flex-1"
+              style={{ flex: 1 }}
               leftIcon={<MessageSquare size={16} color="#ffffff" />}
               onPress={handleChatWithSeller}
             >
               Chat with Seller
             </Button>
-            <Pressable
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<Phone size={15} color="#1F5C3A" />}
               onPress={handleCall}
-              className="flex-row items-center justify-center gap-1.5 px-4 py-2.5 bg-white border border-[#CDE5D2] rounded-xl"
             >
-              <Phone size={14} color="#1F5C3A" />
-              <Text className="font-bold text-xs text-[#1F5C3A]">Call</Text>
-            </Pressable>
+              Call
+            </Button>
           </View>
         </View>
 
@@ -223,29 +224,35 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
                           onClose();
                           goToSubScreen('product_detail', { listingId: listing._id });
                         }}
-                        className="px-2.5 py-1.5 rounded-xl bg-slate-100"
+                        style={({ pressed }) => [
+                          pressed && { opacity: 0.75, backgroundColor: '#E2E8F0' },
+                        ]}
+                        className="px-2.5 py-1.5 rounded-xl bg-slate-100 min-h-[32px] justify-center"
                       >
                         <Text className="text-[10px] font-bold text-[#4B6B56]">View</Text>
                       </Pressable>
                       <Pressable
                         onPress={() => handleAddToCart(listing)}
-                        className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl ${
+                        style={({ pressed }) => [
+                          pressed && { opacity: 0.88, transform: [{ scale: 0.96 }] },
+                        ]}
+                        className={`flex-row items-center gap-1 px-3 py-1.5 rounded-xl min-h-[32px] justify-center ${
                           isAdded || !inCart ? 'bg-[#1F5C3A]' : 'bg-[#E6F2E8]'
                         }`}
                       >
                         {isAdded ? (
                           <View className="flex-row items-center gap-1">
-                            <Check size={14} color="#ffffff" />
+                            <Check size={14} color="#ffffff" strokeWidth={2.5} />
                             <Text className="text-xs font-bold text-white">Added</Text>
                           </View>
                         ) : inCart ? (
                           <View className="flex-row items-center gap-1">
-                            <Check size={12} color="#1F5C3A" />
+                            <Check size={12} color="#1F5C3A" strokeWidth={2.5} />
                             <Text className="text-xs font-bold text-[#1F5C3A]">In Cart</Text>
                           </View>
                         ) : (
                           <View className="flex-row items-center gap-1">
-                            <Plus size={14} color="#ffffff" />
+                            <Plus size={14} color="#ffffff" strokeWidth={2.5} />
                             <Text className="text-xs font-bold text-white">Add</Text>
                           </View>
                         )}
