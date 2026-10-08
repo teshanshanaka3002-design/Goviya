@@ -16,6 +16,7 @@ import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
 import { ProduceVisual } from '../ui/ProduceVisual';
 import { Listing } from '../../types';
+import { isValidPhotoUrl } from '../../services/imageService';
 
 interface SellerProfileModalProps {
   farmerId: string | null;
@@ -179,10 +180,7 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
               {farmerListings.map(listing => {
                 const isAdded = addedListingIds[listing._id];
                 const inCart = cart.some(c => c.listing._id === listing._id);
-                const hasPhoto =
-                  listing.photos &&
-                  listing.photos.length > 0 &&
-                  (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http'));
+                const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
 
                 return (
                   <View

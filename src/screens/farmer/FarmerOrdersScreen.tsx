@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { Card } from '../../components/ui/Card';
+import { isValidPhotoUrl } from '../../services/imageService';
 import { Button } from '../../components/ui/Button';
 import { StatusPill } from '../../components/ui/StatusPill';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -233,9 +234,7 @@ export const FarmerOrdersScreen: React.FC = () => {
                   {/* Items in Order with Product Photo (Matching Buyer's View) */}
                   <View style={{ gap: 8 }}>
                     {order.items.map((item, idx) => {
-                      const hasPhoto =
-                        item.photoUrl &&
-                        (item.photoUrl.startsWith('data:image') || item.photoUrl.startsWith('http'));
+                      const hasPhoto = isValidPhotoUrl(item.photoUrl);
 
                       return (
                         <View key={idx} className="flex-row items-center gap-3">

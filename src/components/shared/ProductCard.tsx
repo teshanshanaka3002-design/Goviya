@@ -5,6 +5,7 @@ import { Listing } from '../../types';
 import { ProduceVisual } from '../ui/ProduceVisual';
 import { useApp } from '../../services/store';
 import { SellerProfileModal } from './SellerProfileModal';
+import { isValidPhotoUrl } from '../../services/imageService';
 
 export interface ProductCardProps {
   listing: Listing;
@@ -41,10 +42,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
-  const hasPhoto =
-    listing.photos &&
-    listing.photos.length > 0 &&
-    (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http'));
+  const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
 
   if (compact) {
     return (

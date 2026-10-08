@@ -26,6 +26,8 @@ import {
   Sprout,
   Sparkles,
   Camera,
+  ImagePlus,
+  Upload,
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { Card } from '../../components/ui/Card';
@@ -38,6 +40,11 @@ import { Input } from '../../components/ui/Input';
 import { Avatar } from '../../components/ui/Avatar';
 import { Order, OrderStatus, Listing } from '../../types';
 import { FarmerOrdersScreen } from './FarmerOrdersScreen';
+import {
+  pickImageFromGallery,
+  captureImageWithCamera,
+  isValidPhotoUrl,
+} from '../../services/imageService';
 
 export const HARVEST_PHOTO_PRESETS = [
   {
@@ -189,9 +196,7 @@ export const FarmerHomeScreen: React.FC = () => {
             </View>
             {pendingOrders.map(order => {
               const firstItem = order.items[0];
-              const hasPhoto =
-                firstItem?.photoUrl &&
-                (firstItem.photoUrl.startsWith('data:image') || firstItem.photoUrl.startsWith('http'));
+              const hasPhoto = isValidPhotoUrl(firstItem?.photoUrl);
 
               return (
                 <Card key={order._id} padding="md" className="border-l-4 border-l-[#B45309] gap-2.5">
@@ -318,7 +323,8 @@ export const FarmerListingsScreen: React.FC = () => {
   const [editPricePerKg, setEditPricePerKg] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editIsOrganic, setEditIsOrganic] = useState(false);
-  const [editPhotoUrl, setEditPhotoUrl] = useState('');
+  const [editPhotos, setEditPhotos] = useState<string[]>([]);
+  const [isUploadingEditPhoto, setIsUploadingEditPhoto] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
   const categories: Array<'Vegetables' | 'Fruits' | 'Spices & Herbs' | 'Grains & Rice' | 'Tubers'> = [
@@ -338,6 +344,28 @@ export const FarmerListingsScreen: React.FC = () => {
     return true;
   });
 
+  const handlePickGalleryForEdit = async () => {
+    setIsUploadingEditPhoto(true);
+    const uri = await pickImageFromGallery();
+    setIsUploadingEditPhoto(false);
+    if (uri) {
+      setEditPhotos(prev => [uri, ...prev]);
+    }
+  };
+
+  const handleCaptureCameraForEdit = async () => {
+    setIsUploadingEditPhoto(true);
+    const uri = await captureImageWithCamera();
+    setIsUploadingEditPhoto(false);
+    if (uri) {
+      setEditPhotos(prev => [uri, ...prev]);
+    }
+  };
+
+  const handleRemoveEditPhoto = (idxToRemove: number) => {
+    setEditPhotos(prev => prev.filter((_, idx) => idx !== idxToRemove));
+  };
+
   const openEditModal = (listing: Listing) => {
     setEditingListing(listing);
     setEditCropName(listing.cropName);
@@ -347,7 +375,7 @@ export const FarmerListingsScreen: React.FC = () => {
     setEditPricePerKg(listing.pricePerKg.toString());
     setEditDescription(listing.description || '');
     setEditIsOrganic(Boolean(listing.isOrganic));
-    setEditPhotoUrl(listing.photos?.[0] || '');
+    setEditPhotos(listing.photos && listing.photos.length > 0 ? [...listing.photos] : []);
     setEditError(null);
   };
 
@@ -370,9 +398,9 @@ export const FarmerListingsScreen: React.FC = () => {
       return;
     }
 
-    const updatedPhotos = editPhotoUrl
-      ? [editPhotoUrl, ...(editingListing.photos || []).filter(u => u !== editPhotoUrl)]
-      : editingListing.photos;
+    const finalPhotos = editPhotos.length > 0
+      ? editPhotos
+      : (editingListing.photos && editingListing.photos.length > 0 ? editingListing.photos : [HARVEST_PHOTO_PRESETS[0].url]);
 
     updateListing(editingListing._id, {
       cropName: editCropName.trim(),
@@ -382,7 +410,7 @@ export const FarmerListingsScreen: React.FC = () => {
       pricePerKg: p,
       description: editDescription.trim(),
       isOrganic: editIsOrganic,
-      photos: updatedPhotos,
+      photos: finalPhotos,
       status: q === 0 ? 'out_of_stock' : editingListing.status,
     });
 
@@ -477,10 +505,7 @@ export const FarmerListingsScreen: React.FC = () => {
         ) : (
           <View style={{ gap: 12 }}>
             {filteredListings.map(listing => {
-              const hasPhoto =
-                listing.photos &&
-                listing.photos.length > 0 &&
-                (listing.photos[0].startsWith('http') || listing.photos[0].startsWith('data:image'));
+              const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
               const isSoldOut = listing.status === 'out_of_stock';
 
               return (
@@ -714,32 +739,142 @@ export const FarmerListingsScreen: React.FC = () => {
             </View>
           </Pressable>
 
-          {/* Photo Presets */}
-          <View style={{ gap: 6 }}>
-            <Text className="text-xs font-bold text-[#4B5563]">Product Photo Preset</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-              {HARVEST_PHOTO_PRESETS.map((preset, index) => {
-                const isSelected = editPhotoUrl === preset.url;
-                return (
-                  <Pressable
-                    key={index}
-                    onPress={() => setEditPhotoUrl(preset.url)}
-                    className={`rounded-xl overflow-hidden border-2 p-0.5 ${
-                      isSelected ? 'border-[#1F5C3A]' : 'border-transparent'
-                    }`}
+          {/* Photos Management & Phone Upload Section */}
+          <View style={{ gap: 8 }}>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xs font-bold text-[#4B5563]">Listing Photos</Text>
+              <Text className="text-[10px] text-[#6B7280]">
+                {editPhotos.length} {editPhotos.length === 1 ? 'photo' : 'photos'} attached
+              </Text>
+            </View>
+
+            {/* Current Photos Thumbnails */}
+            {editPhotos.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+                {editPhotos.map((photoUri, pIdx) => (
+                  <View
+                    key={pIdx}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      borderWidth: 2,
+                      borderColor: pIdx === 0 ? '#1F5C3A' : '#E2E8F0',
+                      position: 'relative',
+                      backgroundColor: '#F1F5F9',
+                    }}
                   >
-                    <Image
-                      source={{ uri: preset.url }}
-                      style={{ width: 64, height: 64, borderRadius: 8 }}
-                      resizeMode="cover"
-                    />
-                    <Text className="text-[9px] font-bold text-center mt-1 text-[#4B5563]">
-                      {preset.tag}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                    <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    {pIdx === 0 && (
+                      <View style={{ position: 'absolute', bottom: 3, left: 3, right: 3, backgroundColor: 'rgba(31, 92, 58, 0.9)', borderRadius: 3, paddingVertical: 1, alignItems: 'center' }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 8, fontWeight: '800' }}>COVER</Text>
+                      </View>
+                    )}
+                    <Pressable
+                      onPress={() => handleRemoveEditPhoto(pIdx)}
+                      style={{
+                        position: 'absolute',
+                        top: 3,
+                        right: 3,
+                        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                        width: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <X size={10} color="#FFFFFF" strokeWidth={2.5} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Upload from Phone Buttons */}
+            <View className="flex-row gap-2">
+              <Pressable
+                onPress={handleCaptureCameraForEdit}
+                disabled={isUploadingEditPhoto}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    backgroundColor: '#F8FAFC',
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    borderStyle: 'dashed',
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Camera size={15} color="#1F5C3A" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1F5C3A' }}>
+                  Take Photo
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handlePickGalleryForEdit}
+                disabled={isUploadingEditPhoto}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    backgroundColor: '#F8FAFC',
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    borderStyle: 'dashed',
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <ImagePlus size={15} color="#1F5C3A" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1F5C3A' }}>
+                  Upload from Phone
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Add Preset Option */}
+            <View style={{ gap: 4, marginTop: 2 }}>
+              <Text className="text-[10px] text-[#6B7280]">Or add a harvest preset:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {HARVEST_PHOTO_PRESETS.map((preset, index) => {
+                  const isAlreadyIn = editPhotos.includes(preset.url);
+                  return (
+                    <Pressable
+                      key={index}
+                      onPress={() => {
+                        if (!isAlreadyIn) {
+                          setEditPhotos(prev => [preset.url, ...prev]);
+                        }
+                      }}
+                      className={`rounded-lg overflow-hidden border p-0.5 ${
+                        isAlreadyIn ? 'border-[#1F5C3A]' : 'border-[#E2E8F0]'
+                      }`}
+                    >
+                      <Image
+                        source={{ uri: preset.url }}
+                        style={{ width: 48, height: 48, borderRadius: 6 }}
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
 
           {/* Quality Notes */}
@@ -791,6 +926,8 @@ export const FarmerAddListingScreen: React.FC = () => {
     'Freshly harvested highland grade produce. Graded for wholesale quality and packed in ventilated crates.'
   );
   const [isOrganic, setIsOrganic] = useState(true);
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -802,6 +939,28 @@ export const FarmerAddListingScreen: React.FC = () => {
     'Grains & Rice',
     'Tubers',
   ];
+
+  const handlePickGallery = async () => {
+    setIsUploadingPhoto(true);
+    const uri = await pickImageFromGallery();
+    setIsUploadingPhoto(false);
+    if (uri) {
+      setUploadedPhotos(prev => [uri, ...prev]);
+    }
+  };
+
+  const handleCaptureCamera = async () => {
+    setIsUploadingPhoto(true);
+    const uri = await captureImageWithCamera();
+    setIsUploadingPhoto(false);
+    if (uri) {
+      setUploadedPhotos(prev => [uri, ...prev]);
+    }
+  };
+
+  const handleRemoveUploadedPhoto = (idxToRemove: number) => {
+    setUploadedPhotos(prev => prev.filter((_, idx) => idx !== idxToRemove));
+  };
 
   const handleSubmit = () => {
     if (!cropName.trim()) {
@@ -821,6 +980,10 @@ export const FarmerAddListingScreen: React.FC = () => {
       return;
     }
 
+    const finalPhotos = uploadedPhotos.length > 0
+      ? uploadedPhotos
+      : [HARVEST_PHOTO_PRESETS[selectedPhotoIndex]?.url || ''];
+
     addListing({
       cropName: cropName.trim(),
       category,
@@ -828,7 +991,7 @@ export const FarmerAddListingScreen: React.FC = () => {
       minOrderKg: isNaN(m) || m <= 0 ? 5 : m,
       pricePerKg: p,
       harvestDate: new Date().toISOString().split('T')[0],
-      photos: [HARVEST_PHOTO_PRESETS[selectedPhotoIndex]?.url || ''],
+      photos: finalPhotos,
       description: description.trim(),
       status: 'active',
       location: {
@@ -992,31 +1155,161 @@ export const FarmerAddListingScreen: React.FC = () => {
             </View>
           </Pressable>
 
-          {/* Preset Photo Selector */}
-          <View>
-            <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider mb-2">
-              Harvest Verification Photo
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, flexDirection: 'row' }}>
-              {HARVEST_PHOTO_PRESETS.map((preset, idx) => (
-                <Pressable
-                  key={idx}
-                  onPress={() => setSelectedPhotoIndex(idx)}
-                  style={({ pressed }) => [
-                    { width: 80, height: 80, borderRadius: 12, overflow: 'hidden', borderWidth: 2 },
-                    selectedPhotoIndex === idx ? { borderColor: '#1F5C3A' } : { borderColor: '#E2E8F0' },
-                    pressed && { opacity: 0.8 },
-                  ]}
-                >
-                  <Image source={{ uri: preset.url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                  {selectedPhotoIndex === idx && (
-                    <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: '#1F5C3A', borderRadius: 10, padding: 2 }}>
-                      <Check size={10} color="#FFFFFF" strokeWidth={3} />
+          {/* Harvest & Crop Photos Upload Section */}
+          <View style={{ gap: 10 }}>
+            <View className="flex-row items-center justify-between">
+              <View>
+                <Text className="text-xs font-bold text-[#1A1A1A] uppercase tracking-wider">
+                  Harvest Photos
+                </Text>
+                <Text className="text-[10px] text-[#6B7280]">
+                  Upload real harvest photos from your phone or choose presets
+                </Text>
+              </View>
+              {uploadedPhotos.length > 0 && (
+                <View className="bg-[#E6F2E8] px-2 py-0.5 rounded-full border border-[#CDE5D2]">
+                  <Text className="text-[10px] font-bold text-[#1F5C3A]">
+                    {uploadedPhotos.length} {uploadedPhotos.length === 1 ? 'Photo' : 'Photos'} Ready
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Upload Action Buttons */}
+            <View className="flex-row gap-2.5">
+              <Pressable
+                onPress={handleCaptureCamera}
+                disabled={isUploadingPhoto}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    backgroundColor: '#F8FAFC',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    borderStyle: 'dashed',
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Camera size={18} color="#1F5C3A" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1F5C3A' }}>
+                  Take Photo
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handlePickGallery}
+                disabled={isUploadingPhoto}
+                style={({ pressed }) => [
+                  {
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    backgroundColor: '#F8FAFC',
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    borderStyle: 'dashed',
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <ImagePlus size={18} color="#1F5C3A" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1F5C3A' }}>
+                  Upload from Phone
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Uploaded Photos Preview List */}
+            {uploadedPhotos.length > 0 && (
+              <View style={{ gap: 6 }}>
+                <Text className="text-[11px] font-bold text-[#4B5563]">
+                  Uploaded Crop Images ({uploadedPhotos.length}):
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4 }}>
+                  {uploadedPhotos.map((photoUri, pIdx) => (
+                    <View
+                      key={pIdx}
+                      style={{
+                        width: 84,
+                        height: 84,
+                        borderRadius: 12,
+                        overflow: 'hidden',
+                        borderWidth: 2,
+                        borderColor: pIdx === 0 ? '#1F5C3A' : '#E2E8F0',
+                        position: 'relative',
+                        backgroundColor: '#F1F5F9',
+                      }}
+                    >
+                      <Image source={{ uri: photoUri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      {pIdx === 0 && (
+                        <View style={{ position: 'absolute', bottom: 4, left: 4, right: 4, backgroundColor: 'rgba(31, 92, 58, 0.9)', borderRadius: 4, paddingVertical: 1, alignItems: 'center' }}>
+                          <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>COVER</Text>
+                        </View>
+                      )}
+                      <Pressable
+                        onPress={() => handleRemoveUploadedPhoto(pIdx)}
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                          width: 20,
+                          height: 20,
+                          borderRadius: 10,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <X size={12} color="#FFFFFF" strokeWidth={2.5} />
+                      </Pressable>
                     </View>
-                  )}
-                </Pressable>
-              ))}
-            </ScrollView>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Presets Row */}
+            <View style={{ gap: 6 }}>
+              <Text className="text-[11px] font-bold text-[#6B7280]">
+                {uploadedPhotos.length > 0 ? 'Or use sample preset photos instead:' : 'Or select a quick harvest preset:'}
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
+                {HARVEST_PHOTO_PRESETS.map((preset, idx) => {
+                  const isSelected = uploadedPhotos.length === 0 && selectedPhotoIndex === idx;
+                  return (
+                    <Pressable
+                      key={idx}
+                      onPress={() => {
+                        setSelectedPhotoIndex(idx);
+                      }}
+                      style={({ pressed }) => [
+                        { width: 72, height: 72, borderRadius: 10, overflow: 'hidden', borderWidth: 2 },
+                        isSelected ? { borderColor: '#1F5C3A' } : { borderColor: '#E2E8F0' },
+                        pressed && { opacity: 0.8 },
+                      ]}
+                    >
+                      <Image source={{ uri: preset.url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      {isSelected && (
+                        <View style={{ position: 'absolute', top: 3, right: 3, backgroundColor: '#1F5C3A', borderRadius: 8, padding: 2 }}>
+                          <Check size={9} color="#FFFFFF" strokeWidth={3} />
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
 
           <Input

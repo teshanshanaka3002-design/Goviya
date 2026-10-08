@@ -25,6 +25,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
 import { Order } from '../../types';
+import { isValidPhotoUrl } from '../../services/imageService';
 
 export const DriverHomeScreen: React.FC = () => {
   const {
@@ -212,9 +213,7 @@ export const DriverHomeScreen: React.FC = () => {
                   {/* Cargo Items with Photos */}
                   <View className="flex-row items-center gap-3 bg-[#F9FAFB] p-2 rounded-xl">
                     {order.items.slice(0, 2).map((item, idx) => {
-                      const hasPhoto =
-                        item.photoUrl &&
-                        (item.photoUrl.startsWith('data:image') || item.photoUrl.startsWith('http'));
+                      const hasPhoto = isValidPhotoUrl(item.photoUrl);
 
                       return (
                         <View key={idx} className="flex-row items-center gap-2 flex-1">

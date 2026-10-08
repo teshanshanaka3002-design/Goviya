@@ -47,6 +47,7 @@ import {
   Lock,
   TrendingUp,
   TrendingDown,
+  Camera,
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
@@ -62,6 +63,7 @@ import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
 import { SellerProfileModal } from '../../components/shared/SellerProfileModal';
 import { Listing, OrderStatus } from '../../types';
+import { isValidPhotoUrl } from '../../services/imageService';
 
 // ===================== 1. BUYER HOME SCREEN =====================
 export const BuyerHomeScreen: React.FC = () => {
@@ -444,10 +446,10 @@ export const BuyerProductDetailScreen: React.FC = () => {
     goToSubScreen('chat_detail', { conversationId: convId });
   };
 
-  const hasPhoto =
-    listing.photos &&
-    listing.photos.length > 0 &&
-    (listing.photos[0].startsWith('data:image') || listing.photos[0].startsWith('http'));
+  const validPhotos = (listing.photos || []).filter(p => isValidPhotoUrl(p));
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const currentPhoto = validPhotos[activePhotoIndex] || validPhotos[0];
+  const hasPhoto = Boolean(currentPhoto);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F8FAF8' }}>
@@ -456,7 +458,7 @@ export const BuyerProductDetailScreen: React.FC = () => {
         <View style={s.detailHeroMedia}>
           {hasPhoto ? (
             <Image
-              source={{ uri: listing.photos[0] }}
+              source={{ uri: currentPhoto }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
@@ -476,7 +478,56 @@ export const BuyerProductDetailScreen: React.FC = () => {
               <Text style={s.detailOrganicText}>100% Organic Certified</Text>
             </View>
           )}
+
+          {validPhotos.length > 1 && (
+            <View style={s.detailPhotoCountPill}>
+              <Camera size={12} color="#FFFFFF" />
+              <Text style={s.detailPhotoCountText}>
+                {activePhotoIndex + 1}/{validPhotos.length} Photos
+              </Text>
+            </View>
+          )}
         </View>
+
+        {/* Thumbnail gallery if multiple harvest photos uploaded */}
+        {validPhotos.length > 1 && (
+          <View style={{ backgroundColor: '#FFFFFF', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                gap: 8,
+                paddingHorizontal: 16,
+              }}
+            >
+              {validPhotos.map((photoUri, pIdx) => {
+                const isSelected = pIdx === activePhotoIndex;
+                return (
+                  <Pressable
+                    key={pIdx}
+                    onPress={() => setActivePhotoIndex(pIdx)}
+                    style={{
+                      width: 54,
+                      height: 54,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      borderWidth: 2,
+                      borderColor: isSelected ? '#1F5C3A' : '#E2E8F0',
+                      opacity: isSelected ? 1 : 0.65,
+                      backgroundColor: '#F1F5F9',
+                    }}
+                  >
+                    <Image
+                      source={{ uri: photoUri }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Content Body */}
         <View style={{ padding: 16, gap: 14 }}>
@@ -1239,10 +1290,7 @@ export const BuyerCartScreen: React.FC = () => {
 
         <View style={{ gap: 10 }}>
           {cart.map(item => {
-            const hasPhoto =
-              item.listing.photos &&
-              item.listing.photos.length > 0 &&
-              (item.listing.photos[0].startsWith('data:image') || item.listing.photos[0].startsWith('http'));
+            const hasPhoto = isValidPhotoUrl(item.listing.photos?.[0]);
 
             return (
               <Card key={item.listing._id} padding="md">
@@ -2431,9 +2479,7 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
                 Items in this Order
               </Text>
               {activeOrder.items.map((item, idx) => {
-                const hasPhoto =
-                  item.photoUrl &&
-                  (item.photoUrl.startsWith('data:image') || item.photoUrl.startsWith('http'));
+                const hasPhoto = isValidPhotoUrl(item.photoUrl);
 
                 return (
                   <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -3508,6 +3554,23 @@ const s = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '800',
+  },
+  detailPhotoCountPill: {
+    position: 'absolute',
+    bottom: 14,
+    right: 14,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  detailPhotoCountText: {
+    color: '#FFFFFF',
+    fontSize: 10.5,
+    fontWeight: '700',
   },
   ratingPill: {
     flexDirection: 'row',
