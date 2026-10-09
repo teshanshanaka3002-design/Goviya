@@ -372,9 +372,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           }}
         >
           {view === 'login' ? (
-            /* Login Header: Circular Badge + Welcome back! */
+            /* Login Header: Square Badge + Welcome back! */
             <View style={{ alignItems: 'center' }}>
-              <GoviyaMarketplaceBadge shape="circle" size={78} />
+              <GoviyaMarketplaceBadge shape="square" size={80} />
               <Text
                 style={{
                   fontSize: 27,

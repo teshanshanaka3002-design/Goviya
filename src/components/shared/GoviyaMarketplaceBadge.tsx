@@ -18,7 +18,7 @@ export const GoviyaMarketplaceBadge: React.FC<GoviyaMarketplaceBadgeProps> = ({
   size = 72,
   shape = 'circle',
 }) => {
-  const borderRadius = shape === 'circle' ? size / 2 : size * 0.22;
+  const borderRadius = shape === 'circle' ? size / 2 : Math.round(size * 0.22);
 
   return (
     <View
@@ -29,10 +29,10 @@ export const GoviyaMarketplaceBadge: React.FC<GoviyaMarketplaceBadgeProps> = ({
         backgroundColor: '#FFFFFF',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: size * 0.08,
+        padding: size * 0.07,
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.12,
+        shadowOpacity: 0.14,
         shadowRadius: 8,
         elevation: 5,
         overflow: 'hidden',
