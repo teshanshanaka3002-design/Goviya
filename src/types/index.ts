@@ -27,6 +27,7 @@ export interface User {
   totalRatings?: number;
   createdAt: string;
   isDeactivated?: boolean;
+  isOnline?: boolean;
   verificationDocuments?: {
     id: string;
     type: 'nic_front' | 'nic_back' | 'grama_certificate' | 'farm_deed' | 'business_reg';

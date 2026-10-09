@@ -154,21 +154,27 @@ export const FarmerHomeScreen: React.FC = () => {
         <View className="flex-row gap-2">
           <Pressable onPress={() => setTab('orders')} style={{ flex: 1 }}>
             <Card padding="sm" className="bg-white items-center">
-              <Text className="text-[10px] text-[#6B7280] font-bold">PENDING ORDERS</Text>
-              <Text className="text-lg font-black text-[#B45309]">{pendingOrders.length}</Text>
+              <View style={{ height: 24, justifyContent: 'center', alignItems: 'center' }}>
+                <Text className="text-[10px] text-[#6B7280] font-bold" numberOfLines={1}>PENDING ORDERS</Text>
+              </View>
+              <Text className="text-base font-black text-[#B45309] mt-0.5" numberOfLines={1}>{pendingOrders.length}</Text>
             </Card>
           </Pressable>
 
           <Pressable onPress={() => setTab('listings')} style={{ flex: 1 }}>
             <Card padding="sm" className="bg-white items-center">
-              <Text className="text-[10px] text-[#6B7280] font-bold">ACTIVE CROPS</Text>
-              <Text className="text-lg font-black text-[#1F5C3A]">{myListings.length}</Text>
+              <View style={{ height: 24, justifyContent: 'center', alignItems: 'center' }}>
+                <Text className="text-[10px] text-[#6B7280] font-bold" numberOfLines={1}>ACTIVE CROPS</Text>
+              </View>
+              <Text className="text-base font-black text-[#1F5C3A] mt-0.5" numberOfLines={1}>{myListings.length}</Text>
             </Card>
           </Pressable>
 
           <Card padding="sm" className="flex-1 bg-white items-center">
-            <Text className="text-[10px] text-[#6B7280] font-bold">DELIVERED LKR</Text>
-            <Text className="text-lg font-black text-[#19768A]">
+            <View style={{ height: 24, justifyContent: 'center', alignItems: 'center' }}>
+              <Text className="text-[10px] text-[#6B7280] font-bold" numberOfLines={1}>DELIVERED LKR</Text>
+            </View>
+            <Text className="text-base font-black text-[#19768A] mt-0.5" numberOfLines={1}>
               LKR {totalRevenue.toLocaleString()}
             </Text>
           </Card>

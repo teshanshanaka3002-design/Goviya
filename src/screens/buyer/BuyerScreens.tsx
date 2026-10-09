@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -52,7 +52,7 @@ import {
   Flame,
   Percent,
 } from 'lucide-react-native';
-import { useApp } from '../../services/store';
+import { useApp, db, doc, onSnapshot } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
 import { SriLankaMap } from '../../components/shared/SriLankaMap';
 import { Input, SearchBar } from '../../components/ui/Input';
@@ -66,7 +66,7 @@ import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
 import { SellerProfileModal } from '../../components/shared/SellerProfileModal';
 import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
-import { Listing, OrderStatus } from '../../types';
+import { Listing, Order, OrderStatus } from '../../types';
 import { isValidPhotoUrl } from '../../services/imageService';
 
 // ===================== OFFER CARD COMPONENT =====================
@@ -1803,15 +1803,15 @@ export const BuyerCartScreen: React.FC = () => {
         {/* Cost Breakdown */}
         <Card padding="md">
           <View style={{ gap: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 13, color: '#64748B' }}>Harvest Subtotal</Text>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{`LKR ${subtotal.toLocaleString()}`}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 13, color: '#64748B' }}>Logistics Fleet Delivery</Text>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{`LKR ${deliveryFee.toLocaleString()}`}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
               <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>Total Amount</Text>
               <Text style={{ fontSize: 18, fontWeight: '900', color: '#1F5C3A' }}>{`LKR ${total.toLocaleString()}`}</Text>
             </View>
@@ -2033,23 +2033,23 @@ export const BuyerCheckoutScreen: React.FC = () => {
               Delivery Summary
             </Text>
             <View style={{ gap: 8 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12.5, color: '#64748B' }}>Recipient:</Text>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>{buyerName}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B', flexShrink: 0 }}>Recipient:</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }}>{buyerName}</Text>
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12.5, color: '#64748B' }}>Contact Phone:</Text>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>{buyerPhone}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B', flexShrink: 0 }}>Contact Phone:</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }}>{buyerPhone}</Text>
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12.5, color: '#64748B' }}>Fulfillment:</Text>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B', flexShrink: 0 }}>Fulfillment:</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }}>
                   {deliveryMode === 'delivery' ? `${address}, ${district}` : 'Self-Pickup at Farm Gate'}
                 </Text>
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12.5, color: '#64748B' }}>Produce Count:</Text>
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B', flexShrink: 0 }}>Produce Count:</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }}>
                   {`${cart.length} produce types (${cart.reduce((a, b) => a + b.quantityKg, 0)} kg total)`}
                 </Text>
               </View>
@@ -2556,21 +2556,21 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
       {order && (
         <Card padding="md" style={{ width: '100%', marginTop: 22 }}>
           <View style={{ gap: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 12.5, color: '#64748B' }}>Order Tracking No:</Text>
               <Text style={{ fontSize: 13.5, fontWeight: '900', color: '#1F5C3A' }}>{order.orderNumber}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 12.5, color: '#64748B' }}>Produce:</Text>
-              <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <Text style={{ fontSize: 12.5, color: '#64748B', flexShrink: 0 }}>Produce:</Text>
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right', marginLeft: 8 }}>
                 {order.items.map(i => `${i.cropName} (${i.quantityKg}kg)`).join(', ')}
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 12.5, color: '#64748B' }}>Total Paid/Payable:</Text>
               <Text style={{ fontSize: 14, fontWeight: '900', color: '#1F5C3A' }}>{`LKR ${order.total.toLocaleString()}`}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 12.5, color: '#64748B' }}>Fulfillment:</Text>
               <Text style={{ fontSize: 12.5, fontWeight: '800', color: order.deliveryType === 'pickup' ? '#1D4ED8' : '#065F46' }}>
                 {order.deliveryType === 'pickup' ? 'Farm Gate Self-Pickup' : 'Doorstep Delivery'}
@@ -2642,9 +2642,26 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
   const { orders, navState, buyerConfirmPickup, goToSubScreen, goBack } = useApp();
 
   const myOrders = orders;
-  const activeOrder = navState.selectedOrderId
+  const initialActiveOrder = navState.selectedOrderId
     ? orders.find(o => o._id === navState.selectedOrderId)
     : myOrders[0];
+
+  const [realtimeOrder, setRealtimeOrder] = useState<Order | null>(initialActiveOrder || null);
+
+  // Firestore onSnapshot real-time listener for this order
+  useEffect(() => {
+    if (!initialActiveOrder?._id) return;
+    setRealtimeOrder(initialActiveOrder);
+    const unsub = onSnapshot(doc(db, 'orders', initialActiveOrder._id), (docSnap) => {
+      const data = docSnap.data();
+      if (data) {
+        setRealtimeOrder(data as Order);
+      }
+    });
+    return () => unsub();
+  }, [initialActiveOrder?._id]);
+
+  const activeOrder = realtimeOrder || initialActiveOrder;
 
   const isPickup = activeOrder?.deliveryType === 'pickup';
 
@@ -2937,7 +2954,7 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
                 </View>
 
                 <View style={{ gap: 8 }}>
-                  {activeOrder.timeline.map((event, eIdx) => {
+                  {activeOrder.timeline.map((event: any, eIdx: number) => {
                     const isFarmerEvent = event.status === 'pending' || event.status === 'accepted' || event.status === 'preparing';
 
                     return (
@@ -2994,7 +3011,7 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
               <Text style={{ fontSize: 12, fontWeight: '800', color: '#475569', textTransform: 'uppercase' }}>
                 Items in this Order
               </Text>
-              {activeOrder.items.map((item, idx) => {
+              {activeOrder.items.map((item: any, idx: number) => {
                 const hasPhoto = isValidPhotoUrl(item.photoUrl);
 
                 return (
@@ -3242,20 +3259,23 @@ export const MarketPricesScreen: React.FC = () => {
         <View style={{ gap: 10 }}>
           {filteredPrices.map(item => (
             <Card key={item.id} padding="md">
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>
                     {item.crop}
                   </Text>
-                  <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 1 }}>
+                  <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 1 }} numberOfLines={1}>
                     {item.marketName}
                   </Text>
                 </View>
 
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ fontSize: 16, fontWeight: '900', color: '#1F5C3A' }}>
-                    {`LKR ${item.retailAvgLkr}/kg`}
-                  </Text>
+                <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#1F5C3A' }}>
+                      {`LKR ${item.retailAvgLkr}`}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B' }}>/kg</Text>
+                  </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
                     {item.trend === 'up' ? (
                       <TrendingUp size={13} color="#DC2626" />
@@ -4365,6 +4385,8 @@ const s = StyleSheet.create({
     color: '#0F172A',
     marginTop: 2,
     textAlign: 'center',
+    minHeight: 28,
+    justifyContent: 'center',
   },
   profileStatSub: {
     fontSize: 9.5,

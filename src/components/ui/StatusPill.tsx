@@ -87,7 +87,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
         style={{ backgroundColor: dotColor }}
         className="w-1.5 h-1.5 rounded-full shrink-0"
       />
-      <Text style={{ color: textColor }} className="text-xs font-semibold">
+      <Text style={{ color: textColor }} className="text-xs font-semibold" numberOfLines={1}>
         {displayLabel}
       </Text>
     </View>

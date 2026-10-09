@@ -23,6 +23,17 @@ import {
   mockPlatformStats,
   mockCategories,
 } from './mockData';
+import {
+  db,
+  doc,
+  collection,
+  onSnapshot,
+  updateDoc,
+  setDoc,
+  syncOrdersToFirestore,
+} from './firestore';
+
+export { db, doc, collection, onSnapshot, updateDoc, setDoc };
 
 export interface PlaceOrderInput {
   deliveryType?: 'delivery' | 'pickup';
@@ -301,6 +312,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     safeStorage.setItem(STORAGE_PREFIX + 'orders', JSON.stringify(orders));
+    syncOrdersToFirestore(orders);
   }, [orders]);
 
   useEffect(() => {
@@ -864,17 +876,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const driverAcceptOrder = (orderId: string) => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const driverName = currentUser?.name || 'Roshan Kaluarachchi';
+    const driverPhone = currentUser?.phone || '+94 78 234 5678';
+    const driverVehicle = currentUser?.vehiclePlate
+      ? `${currentUser.vehicleType} · ${currentUser.vehiclePlate}`
+      : 'Dimas Light Truck · WP - LG 8824';
+
+    let updatedOrderObj: Order | null = null;
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const driverName = currentUser?.name || 'Roshan Kaluarachchi';
-          const driverPhone = currentUser?.phone || '+94 78 234 5678';
-          const driverVehicle = currentUser?.vehiclePlate
-            ? `${currentUser.vehicleType} · ${currentUser.vehiclePlate}`
-            : 'Dimas Light Truck · WP - LG 8824';
-
-          return {
+          const updated: Order = {
             ...ord,
             driverId: currentUser?._id || 'user_driver_1',
             driverName,
@@ -891,19 +904,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               },
             ],
           };
+          updatedOrderObj = updated;
+          return updated;
         }
         return ord;
       })
     );
+    if (updatedOrderObj) {
+      updateDoc(doc(db, 'orders', orderId), updatedOrderObj);
+    }
   };
 
   const driverConfirmPickup = (orderId: string) => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let updatedOrderObj: Order | null = null;
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const driverName = ord.driverName || currentUser?.name || 'Roshan Kaluarachchi';
-          return {
+          const updated: Order = {
             ...ord,
             status: 'out_for_delivery',
             driverId: ord.driverId || currentUser?._id || 'user_driver_1',
@@ -925,19 +944,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               },
             ],
           };
+          updatedOrderObj = updated;
+          return updated;
         }
         return ord;
       })
     );
+    if (updatedOrderObj) {
+      updateDoc(doc(db, 'orders', orderId), updatedOrderObj);
+    }
   };
 
   const driverConfirmDelivery = (orderId: string, proofNote?: string) => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let updatedOrderObj: Order | null = null;
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const driverName = ord.driverName || currentUser?.name || 'Roshan Kaluarachchi';
-          return {
+          const updated: Order = {
             ...ord,
             status: 'delivered',
             deliveredAt: nowStr,
@@ -954,10 +979,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               },
             ],
           };
+          updatedOrderObj = updated;
+          return updated;
         }
         return ord;
       })
     );
+    if (updatedOrderObj) {
+      updateDoc(doc(db, 'orders', orderId), updatedOrderObj);
+    }
   };
 
   const buyerConfirmPickup = (orderId: string) => {

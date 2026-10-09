@@ -192,19 +192,24 @@ const styles = StyleSheet.create({
   // Text sizes
   textSizeSm: {
     fontSize: 12,
+    lineHeight: 16,
     fontWeight: '700',
   },
   textSizeMd: {
     fontSize: 13.5,
+    lineHeight: 18,
     fontWeight: '700',
   },
   textSizeLg: {
     fontSize: 15,
+    lineHeight: 20,
     fontWeight: '800',
   },
   // Text colors
   baseText: {
     textAlign: 'center',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
     letterSpacing: 0.2,
   },
   textPrimary: {

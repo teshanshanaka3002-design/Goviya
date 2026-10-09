@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, Modal } from 'react-native';
+import { View, Text, Pressable, Modal, Alert } from 'react-native';
 import {
   ChevronLeft,
   ShoppingCart,
@@ -155,6 +155,43 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   {currentBadge.label}
                 </Text>
               </Pressable>
+
+              {/* Admin Quick Sign Out Button */}
+              {currentRole === 'admin' && (
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(
+                      'Sign Out',
+                      'Are you sure you want to sign out of the Admin Portal?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Sign Out',
+                          style: 'destructive',
+                          onPress: () => logout(),
+                        },
+                      ]
+                    );
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4.5,
+                      borderRadius: 16,
+                      backgroundColor: '#FEF2F2',
+                      borderWidth: 1,
+                      borderColor: '#FECACA',
+                    },
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+                  ]}
+                >
+                  <LogOut size={12} color="#DC2626" />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>Sign Out</Text>
+                </Pressable>
+              )}
 
               {/* Buyer Cart Icon */}
               {currentRole === 'buyer' && !navState.subScreen && (

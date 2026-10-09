@@ -88,48 +88,51 @@ export const AdminDashboardScreen: React.FC = () => {
 
         {/* KPI Cards */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          <Card variant="mint" padding="md" style={{ width: '48%' }}>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-[10px] text-[#4B6B56] uppercase font-bold">Total Orders</Text>
+          <Card variant="mint" padding="md" style={{ flex: 1, minWidth: '47%' }}>
+            <View className="flex-row items-center justify-between" style={{ height: 18 }}>
+              <Text className="text-[10px] text-[#4B6B56] uppercase font-bold" numberOfLines={1}>Total Orders</Text>
               <Package size={14} color="#1F5C3A" />
             </View>
-            <Text className="text-2xl font-black text-[#1F5C3A] mt-1">{totalOrdersCount}</Text>
-            <Text className="text-[10px] text-[#4B6B56] font-semibold mt-0.5">
+            <Text className="text-xl font-black text-[#1F5C3A] mt-1" numberOfLines={1}>{totalOrdersCount}</Text>
+            <Text className="text-[10px] text-[#4B6B56] font-semibold mt-0.5" numberOfLines={1}>
               {pendingOrdersCount} pending farmer action
             </Text>
           </Card>
 
-          <Card padding="md" style={{ width: '48%' }}>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-[10px] text-[#6B7280] uppercase font-bold">Gross (LKR)</Text>
+          <Card padding="md" style={{ flex: 1, minWidth: '47%' }}>
+            <View className="flex-row items-center justify-between" style={{ height: 18 }}>
+              <Text className="text-[10px] text-[#6B7280] uppercase font-bold" numberOfLines={1}>Gross (LKR)</Text>
               <DollarSign size={14} color="#6B7280" />
             </View>
-            <Text className="text-xl font-black text-[#1A1A1A] mt-1">
+            <Text className="text-xl font-black text-[#1A1A1A] mt-1" numberOfLines={1}>
               {(totalGrossLkr / 1000000).toFixed(2)}M LKR
             </Text>
-            <Text className="text-[10px] text-[#1F5C3A] font-semibold mt-0.5">
+            <Text className="text-[10px] text-[#1F5C3A] font-semibold mt-0.5" numberOfLines={1}>
               Direct trade volume
             </Text>
           </Card>
 
-          <Card padding="md" style={{ width: '48%' }}>
-            <Text className="text-[10px] text-[#6B7280] uppercase font-bold">Active Producers</Text>
-            <Text className="text-xl font-black text-[#1A1A1A] mt-1">
+          <Card padding="md" style={{ flex: 1, minWidth: '47%' }}>
+            <View className="flex-row items-center justify-between" style={{ height: 18 }}>
+              <Text className="text-[10px] text-[#6B7280] uppercase font-bold" numberOfLines={1}>Active Producers</Text>
+              <Users size={14} color="#6B7280" />
+            </View>
+            <Text className="text-xl font-black text-[#1A1A1A] mt-1" numberOfLines={1}>
               {platformStats.totalFarmers.toLocaleString()}
             </Text>
-            <Text className="text-[10px] text-[#1F5C3A] font-semibold">+12% this month</Text>
+            <Text className="text-[10px] text-[#1F5C3A] font-semibold mt-0.5" numberOfLines={1}>+12% this month</Text>
           </Card>
 
-          <Pressable style={{ width: '48%' }} onPress={() => setTab('users')}>
+          <Pressable style={{ flex: 1, minWidth: '47%' }} onPress={() => setTab('users')}>
             <Card padding="md" style={{ borderColor: '#FDE68A', backgroundColor: '#FFFDF5' }}>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-[10px] text-[#6B7280] uppercase font-bold">Pending Reviews</Text>
+              <View className="flex-row items-center justify-between" style={{ height: 18 }}>
+                <Text className="text-[10px] text-[#6B7280] uppercase font-bold" numberOfLines={1}>Pending Reviews</Text>
                 <ChevronRight size={14} color="#B45309" />
               </View>
-              <Text className="text-xl font-black text-[#B45309] mt-1">
+              <Text className="text-xl font-black text-[#B45309] mt-1" numberOfLines={1}>
                 {pendingVerificationUsers.length + pendingComplaints.length}
               </Text>
-              <Text className="text-[10px] text-[#B45309] font-semibold">Tap to view queue</Text>
+              <Text className="text-[10px] text-[#B45309] font-semibold mt-0.5" numberOfLines={1}>Tap to view queue</Text>
             </Card>
           </Pressable>
         </View>
@@ -261,7 +264,7 @@ export const AdminDashboardScreen: React.FC = () => {
                   <StatusPill status={order.status} />
                 </View>
 
-                <View className="flex-row justify-between items-center">
+                <View className="flex-row justify-between items-start">
                   <View className="flex-1 mr-2">
                     <Text className="text-xs text-[#4B5563]">
                       <Text className="font-semibold text-[#1A1A1A]">{order.farmerName}</Text> →{' '}
@@ -271,11 +274,11 @@ export const AdminDashboardScreen: React.FC = () => {
                       {order.items.map(i => `${i.cropName} (${i.quantityKg}kg)`).join(', ')}
                     </Text>
                   </View>
-                  <View className="items-end">
+                  <View className="items-end shrink-0">
                     <Text className="text-xs font-black text-[#1F5C3A]">
                       LKR {order.total.toLocaleString()}
                     </Text>
-                    <Text className="text-[9px] text-[#6B7280]">
+                    <Text className="text-[9px] text-[#6B7280] mt-0.5">
                       {order.paymentMethod.replace(/_/g, ' ').toUpperCase()}
                     </Text>
                   </View>
@@ -802,14 +805,14 @@ export const AdminUserVerificationScreen: React.FC = () => {
             </View>
           </View>
 
-          <View className="bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB] flex-row justify-between items-center">
-            <View>
+          <View className="bg-[#F9FAFB] p-3 rounded-xl border border-[#E5E7EB] flex-row justify-between items-start">
+            <View className="flex-1 mr-2">
               <Text className="text-[10px] font-bold text-[#6B7280] uppercase">NIC Number</Text>
               <Text className="text-sm font-black text-[#1A1A1A] mt-0.5">
                 {user.nicNumber || '198214502891'}
               </Text>
             </View>
-            <View className="items-end">
+            <View className="items-end shrink-0">
               <Text className="text-[10px] font-bold text-[#6B7280] uppercase">ID Type</Text>
               <Text className="text-xs font-bold text-[#1F5C3A] mt-0.5">
                 Sri Lanka Smart NIC

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, TextInput, Image, Linking, Modal } from 'react-native';
 import {
   Clock,
@@ -23,7 +23,7 @@ import {
   X,
   Navigation,
 } from 'lucide-react-native';
-import { useApp } from '../../services/store';
+import { useApp, db, doc, onSnapshot } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { isValidPhotoUrl } from '../../services/imageService';
 import { Button } from '../../components/ui/Button';
@@ -52,6 +52,18 @@ export const FarmerOrdersScreen: React.FC = () => {
   const [deliveryTypeFilter, setDeliveryTypeFilter] = useState<'all' | 'delivery' | 'pickup'>('all');
   const [viewScope, setViewScope] = useState<'current_farm' | 'all_farms'>('current_farm');
   const [trackingOrder, setTrackingOrder] = useState<Order | null>(null);
+
+  // Firestore real-time onSnapshot listener for the tracking modal order
+  useEffect(() => {
+    if (!trackingOrder?._id) return;
+    const unsub = onSnapshot(doc(db, 'orders', trackingOrder._id), (docSnap) => {
+      const data = docSnap.data();
+      if (data) {
+        setTrackingOrder(data as Order);
+      }
+    });
+    return () => unsub();
+  }, [trackingOrder?._id]);
 
   const currentFarmerId = currentUser?.role === 'farmer' ? currentUser._id : 'user_farmer_1';
   const currentFarmer = users.find(u => u._id === currentFarmerId) || currentUser;

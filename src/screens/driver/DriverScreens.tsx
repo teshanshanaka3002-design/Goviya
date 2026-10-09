@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,7 @@ import {
   FileText,
   Compass,
 } from 'lucide-react-native';
-import { useApp } from '../../services/store';
+import { useApp, db, doc, collection, onSnapshot } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusPill } from '../../components/ui/StatusPill';
@@ -88,9 +88,25 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
     driverAcceptOrder,
     driverConfirmPickup,
     driverConfirmDelivery,
+    setTab,
   } = useApp();
 
-  const order = orders.find(o => o._id === orderId);
+  const [liveOrder, setLiveOrder] = useState<Order | null>(null);
+
+  // Firestore real-time listener for this specific order
+  useEffect(() => {
+    if (!orderId) return;
+    const unsub = onSnapshot(doc(db, 'orders', orderId), (docSnap) => {
+      const data = docSnap.data();
+      if (data) {
+        setLiveOrder(data as Order);
+      }
+    });
+    return () => unsub();
+  }, [orderId]);
+
+  const initialOrder = orders.find(o => o._id === orderId);
+  const order = liveOrder || initialOrder;
   const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
 
   if (!order) {
@@ -144,8 +160,26 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
             </View>
             <View className="bg-[#E6F2E8] px-3 py-1 rounded-full">
               <Text className="text-xs font-black text-[#1F5C3A]">
-                Fee: LKR {order.deliveryFee?.toLocaleString() || '1,500'}
+                Earnings: LKR {order.deliveryFee?.toLocaleString() || '1,500'}
               </Text>
+            </View>
+          </View>
+
+          {/* Route Distance Metrics Summary */}
+          <View className="flex-row items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200 mt-1">
+            <View className="items-center flex-1">
+              <Text className="text-[10px] text-[#6B7280]">Pickup Distance</Text>
+              <Text className="text-xs font-black text-[#1F5C3A]">~4.2 km</Text>
+            </View>
+            <View className="h-6 w-px bg-slate-300" />
+            <View className="items-center flex-1">
+              <Text className="text-[10px] text-[#6B7280]">Transit Corridor</Text>
+              <Text className="text-xs font-black text-[#1D4ED8]">~18.5 km</Text>
+            </View>
+            <View className="h-6 w-px bg-slate-300" />
+            <View className="items-center flex-1">
+              <Text className="text-[10px] text-[#6B7280]">Total Route</Text>
+              <Text className="text-xs font-black text-[#1A1A1A]">~22.7 km</Text>
             </View>
           </View>
 
@@ -302,9 +336,9 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
             </View>
           ))}
 
-          <View className="pt-2 border-t border-[#E5E7EB] flex-row items-center justify-between">
-            <Text className="text-xs text-[#6B7280]">Payment Method</Text>
-            <Text className="text-xs font-bold text-[#1A1A1A]">
+          <View className="pt-2 border-t border-[#E5E7EB] flex-row items-baseline justify-between">
+            <Text className="text-xs text-[#6B7280] shrink-0">Payment Method</Text>
+            <Text className="text-xs font-bold text-[#1A1A1A] flex-1 text-right ml-2" numberOfLines={1}>
               {order.paymentMethod === 'cash_on_delivery'
                 ? 'Cash on Delivery (Collect from Buyer)'
                 : 'Prepaid Digital / Card'}
@@ -319,12 +353,27 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
               variant="primary"
               size="lg"
               fullWidth
+              leftIcon={<CheckCircle size={18} color="#FFFFFF" />}
               onPress={() => {
                 driverAcceptOrder(order._id);
-                Alert.alert('Delivery Accepted!', 'You have been assigned to this delivery mission.');
+                Alert.alert(
+                  'Delivery Mission Accepted!',
+                  'Assigned to active deliveries. Heading to pickup point at farm gate.',
+                  [
+                    {
+                      text: 'Go to Active Delivery',
+                      onPress: () => {
+                        onBack();
+                        setTab('deliveries');
+                      },
+                    },
+                  ]
+                );
+                onBack();
+                setTab('deliveries');
               }}
             >
-              Accept Delivery Mission (+LKR 1,500)
+              Accept Delivery Mission (+LKR {order.deliveryFee?.toLocaleString() || '1,500'})
             </Button>
           )}
 
@@ -343,7 +392,7 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                   )
                 }
               >
-                Navigate to Farm Gate (Google Maps)
+                Navigate to Pickup
               </Button>
 
               <Button
@@ -353,10 +402,10 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                 leftIcon={<CheckCircle size={18} color="#FFFFFF" />}
                 onPress={() => {
                   driverConfirmPickup(order._id);
-                  Alert.alert('Pickup Confirmed', 'Crates verified and in transit to buyer!');
+                  Alert.alert('Pickup Confirmed', 'Crates verified and in transit to buyer doorstep!');
                 }}
               >
-                Confirm Pickup & Start Delivery
+                Confirm Pickup
               </Button>
             </View>
           )}
@@ -370,7 +419,7 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                 leftIcon={<Navigation size={16} color="#1D4ED8" />}
                 onPress={() => openGoogleMaps(dropoffLocationText)}
               >
-                Navigate to Drop-off (Google Maps)
+                Navigate to Drop-off
               </Button>
 
               <Button
@@ -383,7 +432,7 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                   Alert.alert('Delivery Successful!', 'Delivery completed! Payout added to your Earnings.');
                 }}
               >
-                Confirm Delivery & Handover
+                Confirm Delivery
               </Button>
             </View>
           )}
@@ -394,7 +443,7 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                 ✓ Delivery Successfully Completed & Settled
               </Text>
               <Text className="text-[11px] text-[#166534] mt-0.5">
-                Earnings of LKR 1,500 credited to driver balance
+                Earnings of LKR {order.deliveryFee?.toLocaleString() || '1,500'} credited to driver balance
               </Text>
             </View>
           )}
@@ -417,7 +466,6 @@ export const DriverDeliveriesScreen: React.FC = () => {
     goToSubScreen,
   } = useApp();
 
-  const [activeFilter, setActiveFilter] = useState<'available' | 'active' | 'completed'>('available');
   const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
 
   // Available ready-for-pickup orders near the driver
@@ -435,6 +483,18 @@ export const DriverDeliveriesScreen: React.FC = () => {
       o.driverId === currentDriverId &&
       (o.status === 'ready_for_pickup' || o.status === 'out_for_delivery')
   );
+
+  // Default to 'active' tab if driver has an active delivery
+  const [activeFilter, setActiveFilter] = useState<'available' | 'active' | 'completed'>(() =>
+    activeTrips.length > 0 ? 'active' : 'available'
+  );
+
+  // Automatically switch to 'active' tab if a delivery was accepted
+  useEffect(() => {
+    if (activeTrips.length > 0) {
+      setActiveFilter('active');
+    }
+  }, [activeTrips.length]);
 
   // Completed deliveries
   const completedDeliveries = orders.filter(
@@ -708,37 +768,82 @@ export const DriverDeliveriesScreen: React.FC = () => {
                         className="flex-1 flex-row items-center justify-center gap-1.5 py-2.5 rounded-xl bg-[#DBEAFE]"
                       >
                         <Navigation size={14} color="#1D4ED8" />
-                        <Text className="text-xs font-bold text-[#1D4ED8]">Navigate (Maps)</Text>
+                        <Text className="text-xs font-bold text-[#1D4ED8]">
+                          {isHeadingToPickup ? 'Navigate to Pickup' : 'Navigate to Drop-off'}
+                        </Text>
                       </Pressable>
                     </View>
 
-                    {/* Action Execution Button */}
+                    {/* Step-by-Step Action Execution Buttons */}
                     {isHeadingToPickup ? (
-                      <Button
-                        variant="primary"
-                        size="md"
-                        fullWidth
-                        leftIcon={<CheckCircle size={16} color="#FFFFFF" />}
-                        onPress={() => {
-                          driverConfirmPickup(order._id);
-                          Alert.alert('Pickup Confirmed', 'Harvest is now Out for Delivery!');
-                        }}
-                      >
-                        Confirm Farm Pickup
-                      </Button>
+                      <View className="gap-2">
+                        <Button
+                          variant="outline"
+                          size="md"
+                          fullWidth
+                          leftIcon={<Navigation size={16} color="#1F5C3A" />}
+                          onPress={() =>
+                            openGoogleMaps(
+                              pickupLoc,
+                              order.pickupLocation?.lat,
+                              order.pickupLocation?.lng
+                            )
+                          }
+                        >
+                          Navigate to Pickup
+                        </Button>
+
+                        <Button
+                          variant="primary"
+                          size="md"
+                          fullWidth
+                          leftIcon={<CheckCircle size={16} color="#FFFFFF" />}
+                          onPress={() => {
+                            driverConfirmPickup(order._id);
+                            Alert.alert('Pickup Confirmed', 'Produce verified & crated. Now heading to buyer drop-off!');
+                          }}
+                        >
+                          Confirm Pickup
+                        </Button>
+                      </View>
                     ) : (
-                      <Button
-                        variant="primary"
-                        size="md"
-                        fullWidth
-                        leftIcon={<CheckCircle size={16} color="#FFFFFF" />}
-                        onPress={() => {
-                          driverConfirmDelivery(order._id);
-                          Alert.alert('Delivery Finished', 'Handover confirmed! Payment recorded.');
-                        }}
-                      >
-                        Confirm Buyer Delivery
-                      </Button>
+                      <View className="gap-2">
+                        {/* Buyer Address & Contact visible */}
+                        <View className="p-2.5 bg-blue-50/80 rounded-xl border border-blue-200 gap-1">
+                          <Text className="text-xs font-bold text-[#1E3A8A]">
+                            Buyer Destination: {order.buyerName}
+                          </Text>
+                          <Text className="text-[11px] text-[#2563EB]">
+                            {order.deliveryAddress} ({order.deliveryDistrict})
+                          </Text>
+                          <Text className="text-[11px] font-bold text-[#1D4ED8]">
+                            Contact: {order.buyerPhone}
+                          </Text>
+                        </View>
+
+                        <Button
+                          variant="outline"
+                          size="md"
+                          fullWidth
+                          leftIcon={<Navigation size={16} color="#1D4ED8" />}
+                          onPress={() => openGoogleMaps(order.deliveryAddress)}
+                        >
+                          Navigate to Drop-off
+                        </Button>
+
+                        <Button
+                          variant="primary"
+                          size="md"
+                          fullWidth
+                          leftIcon={<CheckCircle size={16} color="#FFFFFF" />}
+                          onPress={() => {
+                            driverConfirmDelivery(order._id, 'Handed over to buyer at doorstep');
+                            Alert.alert('Delivery Finished', 'Handover confirmed! Payment recorded.');
+                          }}
+                        >
+                          Confirm Delivery
+                        </Button>
+                      </View>
                     )}
                   </Card>
                 );
@@ -839,27 +944,33 @@ export const DriverEarningsScreen: React.FC = () => {
         {/* Earnings Summary Cards */}
         <View className="flex-row gap-2.5">
           <Card variant="mint" padding="sm" className="flex-1">
-            <Text className="text-[10px] uppercase font-bold text-[#4B6B56]">Today's Earnings</Text>
-            <Text className="text-base font-black text-[#1F5C3A] mt-1">
+            <View style={{ height: 26, justifyContent: 'center' }}>
+              <Text className="text-[10px] uppercase font-bold text-[#4B6B56]" numberOfLines={1}>Today</Text>
+            </View>
+            <Text className="text-base font-black text-[#1F5C3A] mt-1" numberOfLines={1}>
               LKR {todayEarnings.toLocaleString()}
             </Text>
-            <Text className="text-[9px] text-[#4B6B56] mt-0.5">Live payout balance</Text>
+            <Text className="text-[9px] text-[#4B6B56] mt-0.5" numberOfLines={1}>Live payout balance</Text>
           </Card>
 
           <Card padding="sm" className="flex-1">
-            <Text className="text-[10px] uppercase font-bold text-[#6B7280]">This Week</Text>
-            <Text className="text-base font-black text-[#1A1A1A] mt-1">
+            <View style={{ height: 26, justifyContent: 'center' }}>
+              <Text className="text-[10px] uppercase font-bold text-[#6B7280]" numberOfLines={1}>This Week</Text>
+            </View>
+            <Text className="text-base font-black text-[#1A1A1A] mt-1" numberOfLines={1}>
               LKR {weekEarnings.toLocaleString()}
             </Text>
-            <Text className="text-[9px] text-[#19768A] mt-0.5">24 completed trips</Text>
+            <Text className="text-[9px] text-[#19768A] mt-0.5" numberOfLines={1}>24 completed trips</Text>
           </Card>
 
           <Card padding="sm" className="flex-1">
-            <Text className="text-[10px] uppercase font-bold text-[#6B7280]">This Month</Text>
-            <Text className="text-base font-black text-[#1A1A1A] mt-1">
+            <View style={{ height: 26, justifyContent: 'center' }}>
+              <Text className="text-[10px] uppercase font-bold text-[#6B7280]" numberOfLines={1}>This Month</Text>
+            </View>
+            <Text className="text-base font-black text-[#1A1A1A] mt-1" numberOfLines={1}>
               LKR {monthEarnings.toLocaleString()}
             </Text>
-            <Text className="text-[9px] text-[#B45309] mt-0.5">Fleet rank: Top 5%</Text>
+            <Text className="text-[9px] text-[#B45309] mt-0.5" numberOfLines={1}>Fleet rank: Top 5%</Text>
           </Card>
         </View>
 
@@ -946,8 +1057,20 @@ export const DriverEarningsScreen: React.FC = () => {
 // ============================================================================
 export const DriverProfileScreen: React.FC = () => {
   const { currentUser, orders, updateCurrentUser, logout } = useApp();
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState(currentUser?.isOnline ?? true);
   const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.isOnline !== undefined) {
+      setIsOnline(currentUser.isOnline);
+    }
+  }, [currentUser?.isOnline]);
+
+  const toggleOnline = () => {
+    const nextState = !isOnline;
+    setIsOnline(nextState);
+    updateCurrentUser({ isOnline: nextState });
+  };
 
   // Edit fields
   const [name, setName] = useState(currentUser?.name || 'Roshan Kaluarachchi');
@@ -1017,12 +1140,16 @@ export const DriverProfileScreen: React.FC = () => {
           </View>
 
           <Pressable
-            onPress={() => setIsOnline(!isOnline)}
-            className={`px-3 py-1.5 rounded-xl ${
+            onPress={toggleOnline}
+            style={{ minWidth: 96, height: 34, alignItems: 'center', justifyContent: 'center' }}
+            className={`px-3 py-1.5 rounded-xl items-center justify-center ${
               isOnline ? 'bg-[#E6F2E8]' : 'bg-slate-100'
             }`}
           >
-            <Text className={`text-xs font-bold ${isOnline ? 'text-[#1F5C3A]' : 'text-[#6B7280]'}`}>
+            <Text
+              style={{ textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}
+              className={`text-xs font-bold text-center ${isOnline ? 'text-[#1F5C3A]' : 'text-[#6B7280]'}`}
+            >
               {isOnline ? 'Go Offline' : 'Go Online'}
             </Text>
           </Pressable>
@@ -1034,46 +1161,52 @@ export const DriverProfileScreen: React.FC = () => {
             Fleet Vehicle Details
           </Text>
 
-          <View className="flex-row items-center justify-between py-1.5 border-b border-[#F0F0EE]">
-            <Text className="text-xs text-[#6B7280]">Vehicle Type</Text>
-            <Text className="text-xs font-bold text-[#1A1A1A]">
+          <View className="flex-row items-baseline justify-between py-1.5 border-b border-[#F0F0EE]">
+            <Text className="text-xs text-[#6B7280] shrink-0">Vehicle Type</Text>
+            <Text className="text-xs font-bold text-[#1A1A1A] flex-1 text-right ml-2" numberOfLines={1}>
               {currentUser?.vehicleType || 'Light Truck (Dimas)'}
             </Text>
           </View>
 
-          <View className="flex-row items-center justify-between py-1.5 border-b border-[#F0F0EE]">
-            <Text className="text-xs text-[#6B7280]">Plate Number</Text>
-            <Text className="text-xs font-bold text-[#1A1A1A]">
+          <View className="flex-row items-baseline justify-between py-1.5 border-b border-[#F0F0EE]">
+            <Text className="text-xs text-[#6B7280] shrink-0">Plate Number</Text>
+            <Text className="text-xs font-bold text-[#1A1A1A] flex-1 text-right ml-2" numberOfLines={1}>
               {currentUser?.vehiclePlate || 'WP - LG 8824'}
             </Text>
           </View>
 
-          <View className="flex-row items-center justify-between py-1.5">
-            <Text className="text-xs text-[#6B7280]">Operating Hub</Text>
-            <Text className="text-xs font-bold text-[#1A1A1A]">Kadawatha Express Hub, Western</Text>
+          <View className="flex-row items-baseline justify-between py-1.5">
+            <Text className="text-xs text-[#6B7280] shrink-0">Operating Hub</Text>
+            <Text className="text-xs font-bold text-[#1A1A1A] flex-1 text-right ml-2" numberOfLines={1}>Kadawatha Express Hub, Western</Text>
           </View>
         </Card>
 
         {/* Performance Statistics */}
         <View className="flex-row gap-2.5">
           <Card padding="md" className="flex-1 items-center gap-1">
-            <View className="flex-row items-center gap-1">
-              <Star size={16} color="#EAB308" fill="#EAB308" />
-              <Text className="text-base font-black text-[#1A1A1A]">4.95</Text>
+            <View style={{ height: 26, justifyContent: 'center', alignItems: 'center' }}>
+              <View className="flex-row items-center gap-1">
+                <Star size={16} color="#EAB308" fill="#EAB308" />
+                <Text className="text-base font-black text-[#1A1A1A]">4.95</Text>
+              </View>
             </View>
-            <Text className="text-[10px] text-[#6B7280]">215 Ratings</Text>
+            <Text className="text-[10px] text-[#6B7280]" numberOfLines={1}>215 Ratings</Text>
           </Card>
 
           <Card padding="md" className="flex-1 items-center gap-1">
-            <Text className="text-base font-black text-[#1F5C3A]">
-              {215 + completedDeliveriesCount}
-            </Text>
-            <Text className="text-[10px] text-[#6B7280]">Deliveries Done</Text>
+            <View style={{ height: 26, justifyContent: 'center', alignItems: 'center' }}>
+              <Text className="text-base font-black text-[#1F5C3A]">
+                {215 + completedDeliveriesCount}
+              </Text>
+            </View>
+            <Text className="text-[10px] text-[#6B7280]" numberOfLines={1}>Deliveries Done</Text>
           </Card>
 
           <Card padding="md" className="flex-1 items-center gap-1">
-            <Text className="text-base font-black text-[#1D4ED8]">99.4%</Text>
-            <Text className="text-[10px] text-[#6B7280]">On-Time Rate</Text>
+            <View style={{ height: 26, justifyContent: 'center', alignItems: 'center' }}>
+              <Text className="text-base font-black text-[#1D4ED8]">99.4%</Text>
+            </View>
+            <Text className="text-[10px] text-[#6B7280]" numberOfLines={1}>On-Time Rate</Text>
           </Card>
         </View>
 
@@ -1081,17 +1214,25 @@ export const DriverProfileScreen: React.FC = () => {
         <View className="gap-2.5 mt-2">
           <Button
             variant="outline"
-            size="md"
+            size="lg"
             fullWidth
             leftIcon={<Edit3 size={16} color="#1F5C3A" />}
             onPress={() => setShowEditModal(true)}
+            textStyle={{
+              textAlign: 'center',
+              textAlignVertical: 'center',
+              includeFontPadding: false,
+              lineHeight: 20,
+              color: '#1F5C3A',
+              fontWeight: '700',
+            }}
           >
             Edit Profile
           </Button>
 
           <Button
             variant="destructive"
-            size="md"
+            size="lg"
             fullWidth
             leftIcon={<LogOut size={16} color="#FFFFFF" />}
             onPress={() => {
@@ -1103,6 +1244,13 @@ export const DriverProfileScreen: React.FC = () => {
                   onPress: () => logout(),
                 },
               ]);
+            }}
+            textStyle={{
+              textAlign: 'center',
+              textAlignVertical: 'center',
+              includeFontPadding: false,
+              lineHeight: 20,
+              fontWeight: '700',
             }}
           >
             Log Out
@@ -1159,7 +1307,18 @@ export const DriverProfileScreen: React.FC = () => {
               </View>
             </View>
 
-            <Button variant="primary" size="lg" fullWidth onPress={handleSaveProfile}>
+            <Button
+              variant="primary"
+              size="lg"
+              fullWidth
+              onPress={handleSaveProfile}
+              textStyle={{
+                textAlign: 'center',
+                textAlignVertical: 'center',
+                includeFontPadding: false,
+                lineHeight: 20,
+              }}
+            >
               Save Profile Changes
             </Button>
           </View>
@@ -1173,8 +1332,21 @@ export const DriverProfileScreen: React.FC = () => {
 // 5. HOME TAB: AVAILABLE DELIVERIES & CORRIDOR MAP
 // ============================================================================
 export const DriverHomeScreen: React.FC = () => {
-  const { orders, currentUser, goToSubScreen } = useApp();
+  const { orders, currentUser, goToSubScreen, updateCurrentUser } = useApp();
   const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
+  const [isOnline, setIsOnline] = useState(currentUser?.isOnline ?? true);
+
+  useEffect(() => {
+    if (currentUser?.isOnline !== undefined) {
+      setIsOnline(currentUser.isOnline);
+    }
+  }, [currentUser?.isOnline]);
+
+  const toggleOnline = () => {
+    const nextState = !isOnline;
+    setIsOnline(nextState);
+    updateCurrentUser({ isOnline: nextState });
+  };
 
   // Available Pickup Jobs
   const availablePickups = orders.filter(
@@ -1205,33 +1377,98 @@ export const DriverHomeScreen: React.FC = () => {
     <ScrollView className="flex-1 bg-[#F6F7F5] p-4" contentContainerStyle={{ paddingBottom: 60 }}>
       <View className="gap-4">
         {/* Fleet Header Card */}
-        <Card padding="md" className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2.5 flex-1">
-            <View className="w-3.5 h-3.5 rounded-full bg-[#1F5C3A]" />
-            <View className="flex-1">
-              <Text className="text-xs font-black text-[#1A1A1A]">
-                Fleet Status: Online · Dispatch Ready
-              </Text>
-              <Text className="text-[10px] text-[#6B7280]">
-                {currentUser?.name || 'Roshan Kaluarachchi'} · {currentUser?.vehiclePlate || 'WP - LG 8824'}
-              </Text>
+        <Card padding="md" className="gap-2.5">
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+              <View className={`w-3.5 h-3.5 rounded-full ${isOnline ? 'bg-[#1F5C3A]' : 'bg-[#9CA3AF]'}`} />
+              <View className="flex-1">
+                <Text className="text-xs font-black text-[#1A1A1A]">
+                  Fleet Status: {isOnline ? 'Online · Dispatch Ready' : 'Offline · On Break'}
+                </Text>
+                <Text className="text-[10px] text-[#6B7280]">
+                  {currentUser?.name || 'Roshan Kaluarachchi'} · {currentUser?.vehiclePlate || 'WP - LG 8824'}
+                </Text>
+              </View>
             </View>
+
+            <Pressable
+              onPress={toggleOnline}
+              style={{ minWidth: 96, height: 34, alignItems: 'center', justifyContent: 'center' }}
+              className={`px-3 py-1.5 rounded-xl items-center justify-center ${
+                isOnline ? 'bg-[#E6F2E8]' : 'bg-slate-100'
+              }`}
+            >
+              <Text
+                style={{ textAlign: 'center', textAlignVertical: 'center', includeFontPadding: false }}
+                className={`text-xs font-bold text-center ${isOnline ? 'text-[#1F5C3A]' : 'text-[#6B7280]'}`}
+              >
+                {isOnline ? 'Go Offline' : 'Go Online'}
+              </Text>
+            </Pressable>
           </View>
 
-          <Pressable
-            onPress={() =>
-              openGoogleMaps(
-                currentUser?.location?.address || 'Kadawatha Logistics Hub',
-                currentUser?.location?.lat,
-                currentUser?.location?.lng
-              )
-            }
-            className="flex-row items-center gap-1 bg-[#E6F2E8] px-2.5 py-1.5 rounded-xl border border-[#86EFAC]"
-          >
-            <Compass size={13} color="#1F5C3A" />
-            <Text className="text-[10px] font-bold text-[#1F5C3A]">My Location</Text>
-          </Pressable>
+          <View className="flex-row items-center justify-between pt-2 border-t border-[#F0F0EE]">
+            <Text className="text-[11px] text-[#6B7280]">
+              {isOnline ? 'Receiving active harvest pickup alerts' : 'Paused · Not accepting new orders'}
+            </Text>
+            <Pressable
+              onPress={() =>
+                openGoogleMaps(
+                  currentUser?.location?.address || 'Kadawatha Logistics Hub',
+                  currentUser?.location?.lat,
+                  currentUser?.location?.lng
+                )
+              }
+              className="flex-row items-center gap-1 bg-[#E6F2E8] px-2.5 py-1 rounded-lg border border-[#86EFAC]"
+            >
+              <Compass size={12} color="#1F5C3A" />
+              <Text className="text-[10px] font-bold text-[#1F5C3A]">My Location</Text>
+            </Pressable>
+          </View>
         </Card>
+
+        {/* 1. NOTIFICATION BANNER: New delivery available near driver */}
+        {availablePickups.length > 0 && isOnline && (
+          <Card
+            padding="md"
+            className="border-2 border-emerald-600 bg-emerald-50/90 gap-2.5 shadow-sm active:opacity-95"
+            onPress={() => goToSubScreen('driver_order_detail', { orderId: availablePickups[0]._id })}
+          >
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2">
+                <View className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+                <Text className="text-[11px] font-black text-[#15803D] uppercase tracking-wider">
+                  Pickup Alert · Ready for Dispatch
+                </Text>
+              </View>
+              <View className="bg-emerald-600 px-2 py-0.5 rounded-full">
+                <Text className="text-[10px] font-bold text-white">
+                  +LKR {availablePickups[0].deliveryFee?.toLocaleString() || '1,500'}
+                </Text>
+              </View>
+            </View>
+
+            <View className="gap-0.5">
+              <Text className="text-sm font-black text-[#1A1A1A]">
+                New delivery available — {availablePickups[0].farmerName}, 4.2 km
+              </Text>
+              <Text className="text-xs text-[#374151]">
+                Pickup: {availablePickups[0].pickupLocation?.town || availablePickups[0].farmerAddress || 'Farm Gate'} → Deliver to: {availablePickups[0].deliveryDistrict}
+              </Text>
+              <Text className="text-[11px] text-[#6B7280]">
+                Cargo: {availablePickups[0].items.map(i => `${i.cropName} (${i.quantityKg}kg)`).join(', ')}
+              </Text>
+            </View>
+
+            <View className="flex-row items-center justify-between pt-1 border-t border-emerald-200">
+              <Text className="text-[11px] font-bold text-[#15803D]">Tap to view details & accept job</Text>
+              <View className="flex-row items-center gap-1">
+                <Text className="text-xs font-black text-[#15803D]">Review Job</Text>
+                <ArrowRight size={14} color="#15803D" />
+              </View>
+            </View>
+          </Card>
+        )}
 
         {/* Metrics Row */}
         <View className="flex-row gap-2.5">

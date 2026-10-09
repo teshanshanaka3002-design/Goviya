@@ -218,10 +218,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </View>
             {listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                <Text style={ps.strikethroughPrice}>
+                <Text style={ps.strikethroughPrice} numberOfLines={1}>
                   {`LKR ${listing.originalPricePerKg}`}
                 </Text>
-                <Text style={ps.savingsText}>
+                <Text style={ps.savingsText} numberOfLines={1}>
                   {`Save LKR ${listing.originalPricePerKg - listing.pricePerKg}`}
                 </Text>
               </View>

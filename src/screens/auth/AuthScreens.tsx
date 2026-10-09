@@ -742,11 +742,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     />
                     <Text
                       style={{
-                        fontSize: 12,
+                        fontSize: 12.5,
                         fontWeight: '700',
                         color:
                           registerRole === 'driver' ? '#1B5E39' : '#4B5563',
                       }}
+                      numberOfLines={1}
                     >
                       Rider
                     </Text>
