@@ -34,7 +34,7 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
   const { users, listings, addToCart, cart, getOrCreateConversation, goToSubScreen } = useApp();
   const [addedListingIds, setAddedListingIds] = React.useState<Record<string, boolean>>({});
 
-  if (!farmerId) return null;
+  if (!isOpen || !farmerId) return null;
 
   const farmerUser = users.find(u => u._id === farmerId && u.role === 'farmer');
   const farmerListings = listings.filter(

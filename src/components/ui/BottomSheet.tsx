@@ -22,6 +22,8 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
 
+  if (!isOpen) return null;
+
   return (
     <Modal
       visible={isOpen}

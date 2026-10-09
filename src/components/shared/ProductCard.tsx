@@ -58,6 +58,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             ) : (
               <ProduceVisual type={listing.cropName} size="sm" />
             )}
+            {listing.discountPercent ? (
+              <View style={ps.compactDiscountBadge}>
+                <Text style={ps.compactDiscountText}>-{listing.discountPercent}%</Text>
+              </View>
+            ) : listing.offerBadge ? (
+              <View style={ps.compactOfferBadge}>
+                <Text style={ps.compactOfferText}>Deal</Text>
+              </View>
+            ) : null}
           </Pressable>
 
           <Pressable onPress={handleClick} style={ps.compactBody}>
@@ -74,8 +83,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {`LKR ${listing.pricePerKg.toLocaleString()}`}
               </Text>
               <Text style={ps.unitText}>/kg</Text>
-              <Text style={ps.minOrderDot}>·</Text>
-              <Text style={ps.minOrderText}>From 1kg</Text>
+              {listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg ? (
+                <Text style={ps.compactOriginalPrice}>
+                  {`LKR ${listing.originalPricePerKg}`}
+                </Text>
+              ) : (
+                <>
+                  <Text style={ps.minOrderDot}>·</Text>
+                  <Text style={ps.minOrderText}>From 1kg</Text>
+                </>
+              )}
             </View>
           </Pressable>
 
@@ -97,18 +114,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </Pressable>
         </View>
 
-        <SellerProfileModal
-          farmerId={listing.farmerId}
-          isOpen={isSellerModalOpen}
-          onClose={() => setIsSellerModalOpen(false)}
-          initialCropName={listing.cropName}
-        />
+        {isSellerModalOpen && (
+          <SellerProfileModal
+            farmerId={listing.farmerId}
+            isOpen={isSellerModalOpen}
+            onClose={() => setIsSellerModalOpen(false)}
+            initialCropName={listing.cropName}
+          />
+        )}
       </View>
     );
   }
 
   return (
-    <View style={{ width: '100%', height: '100%' }}>
+    <View style={{ width: '100%' }}>
       <View style={ps.fullCard}>
         {/* Clickable Header & Details Area */}
         <Pressable
@@ -130,28 +149,44 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <ProduceVisual type={listing.cropName} size="md" />
             )}
 
-            {listing.isOrganic && (
-              <View style={ps.organicBadge}>
-                <Text style={ps.organicBadgeText}>Organic</Text>
-              </View>
-            )}
+            {/* Badges Overlay */}
+            <View style={ps.topBadgesRow}>
+              {listing.discountPercent ? (
+                <View style={ps.discountBadge}>
+                  <Text style={ps.discountBadgeText}>-{listing.discountPercent}%</Text>
+                </View>
+              ) : listing.offerBadge ? (
+                <View style={ps.offerBadge}>
+                  <Text style={ps.offerBadgeText}>{listing.offerBadge}</Text>
+                </View>
+              ) : listing.isOrganic ? (
+                <View style={ps.organicBadge}>
+                  <Text style={ps.organicBadgeText}>Organic</Text>
+                </View>
+              ) : null}
 
-            <View style={ps.ratingBadge}>
-              <Star size={10} color="#F59E0B" fill="#F59E0B" />
-              <Text style={ps.ratingBadgeText}>
-                {listing.farmerRating.toFixed(1)}
-              </Text>
+              <View style={ps.ratingBadge}>
+                <Star size={10} color="#F59E0B" fill="#F59E0B" />
+                <Text style={ps.ratingBadgeText}>
+                  {listing.farmerRating.toFixed(1)}
+                </Text>
+              </View>
             </View>
           </View>
 
           {/* Card Upper Info */}
           <View style={ps.infoSection}>
-            {/* Location */}
+            {/* Location & Secondary Tag */}
             <View style={ps.locationRow}>
               <MapPin size={11} color="#1F5C3A" />
               <Text style={ps.locationText} numberOfLines={1}>
                 {listing.location.town}, {listing.location.district}
               </Text>
+              {listing.isOrganic && (listing.discountPercent || listing.offerBadge) ? (
+                <View style={ps.miniOrganicPill}>
+                  <Text style={ps.miniOrganicText}>Bio</Text>
+                </View>
+              ) : null}
             </View>
 
             {/* Crop Name */}
@@ -181,9 +216,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </Text>
               <Text style={ps.priceUnit}>/kg</Text>
             </View>
-            <Text style={ps.minOrderSubtitle}>
-              From 1 kg
-            </Text>
+            {listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                <Text style={ps.strikethroughPrice}>
+                  {`LKR ${listing.originalPricePerKg}`}
+                </Text>
+                <Text style={ps.savingsText}>
+                  {`Save LKR ${listing.originalPricePerKg - listing.pricePerKg}`}
+                </Text>
+              </View>
+            ) : (
+              <Text style={ps.minOrderSubtitle}>
+                From 1 kg
+              </Text>
+            )}
           </View>
 
           <Pressable
@@ -211,12 +257,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </View>
       </View>
 
-      <SellerProfileModal
-        farmerId={listing.farmerId}
-        isOpen={isSellerModalOpen}
-        onClose={() => setIsSellerModalOpen(false)}
-        initialCropName={listing.cropName}
-      />
+      {isSellerModalOpen && (
+        <SellerProfileModal
+          farmerId={listing.farmerId}
+          isOpen={isSellerModalOpen}
+          onClose={() => setIsSellerModalOpen(false)}
+          initialCropName={listing.cropName}
+        />
+      )}
     </View>
   );
 };
@@ -255,13 +303,54 @@ const ps = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  organicBadge: {
+  topBadgesRow: {
     position: 'absolute',
     top: 8,
     left: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  discountBadge: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  discountBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+  },
+  offerBadge: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 8,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  offerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  organicBadge: {
     backgroundColor: '#1F5C3A',
     paddingHorizontal: 7,
-    paddingVertical: 2.5,
+    paddingVertical: 3,
     borderRadius: 8,
     zIndex: 2,
   },
@@ -272,10 +361,19 @@ const ps = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
+  miniOrganicPill: {
+    backgroundColor: '#E6F2E8',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    marginLeft: 2,
+  },
+  miniOrganicText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#1F5C3A',
+  },
   ratingBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -283,7 +381,6 @@ const ps = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    zIndex: 2,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.06)',
   },
@@ -291,6 +388,54 @@ const ps = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#1E293B',
+  },
+  strikethroughPrice: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+  },
+  savingsText: {
+    fontSize: 9.5,
+    color: '#DC2626',
+    fontWeight: '700',
+  },
+  compactOriginalPrice: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+    marginLeft: 3,
+  },
+  compactDiscountBadge: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 5,
+    zIndex: 2,
+  },
+  compactDiscountText: {
+    fontSize: 8,
+    color: '#fff',
+    fontWeight: '900',
+  },
+  compactOfferBadge: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    backgroundColor: '#D97706',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 5,
+    zIndex: 2,
+  },
+  compactOfferText: {
+    fontSize: 8,
+    color: '#fff',
+    fontWeight: '800',
   },
   infoSection: {
     padding: 10,

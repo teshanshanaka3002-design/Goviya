@@ -48,6 +48,9 @@ import {
   TrendingUp,
   TrendingDown,
   Camera,
+  Tag,
+  Flame,
+  Percent,
 } from 'lucide-react-native';
 import { useApp } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
@@ -66,6 +69,246 @@ import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
 import { Listing, OrderStatus } from '../../types';
 import { isValidPhotoUrl } from '../../services/imageService';
 
+// ===================== OFFER CARD COMPONENT =====================
+const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
+  const { addToCart, goToSubScreen } = useApp();
+  const [justAdded, setJustAdded] = useState(false);
+  const [isSellerModalOpen, setIsSellerModalOpen] = useState(false);
+  const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
+
+  const handleAdd = (e?: any) => {
+    e?.stopPropagation?.();
+    addToCart(listing, 1);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1500);
+  };
+
+  const savings = listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg
+    ? listing.originalPricePerKg - listing.pricePerKg
+    : 0;
+
+  return (
+    <View style={s.offerCardWrapper}>
+      <Pressable
+        onPress={() => goToSubScreen('product_detail', { listingId: listing._id })}
+        style={({ pressed }) => [s.offerCard, pressed && s.btnPressed]}
+      >
+        <View style={s.offerMediaArea}>
+          {hasPhoto ? (
+            <Image source={{ uri: listing.photos[0] }} style={s.offerPhoto} resizeMode="cover" />
+          ) : (
+            <ProduceVisual type={listing.cropName} size="md" />
+          )}
+
+          {/* Offer Badge Ribbon */}
+          <View style={s.offerRibbon}>
+            <Flame size={10} color="#FFFFFF" />
+            <Text style={s.offerRibbonText}>
+              {listing.offerBadge || 'Special Offer'}
+            </Text>
+          </View>
+
+          {/* Rating */}
+          <View style={s.offerRatingBadge}>
+            <Star size={9.5} color="#F59E0B" fill="#F59E0B" />
+            <Text style={s.offerRatingText}>{listing.farmerRating.toFixed(1)}</Text>
+          </View>
+        </View>
+
+        <View style={s.offerBody}>
+          <View style={s.offerLocationRow}>
+            <MapPin size={10} color="#1F5C3A" />
+            <Text style={s.offerLocationText} numberOfLines={1}>
+              {listing.location.town}, {listing.location.district}
+            </Text>
+          </View>
+
+          <Text style={s.offerCropTitle} numberOfLines={1}>
+            {listing.cropName}
+          </Text>
+
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              setIsSellerModalOpen(true);
+            }}
+          >
+            <Text style={s.offerFarmerName} numberOfLines={1}>
+              {listing.farmerName}
+            </Text>
+          </Pressable>
+
+          {listing.offerTitle ? (
+            <Text style={s.offerDealTagline} numberOfLines={1}>
+              ✨ {listing.offerTitle}
+            </Text>
+          ) : null}
+
+          <View style={s.offerPriceBottomRow}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                <Text style={s.offerPriceValue}>
+                  LKR {listing.pricePerKg.toLocaleString()}
+                </Text>
+                <Text style={s.offerPriceUnit}>/kg</Text>
+              </View>
+              {listing.originalPricePerKg && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                  <Text style={s.offerOriginalPrice}>
+                    LKR {listing.originalPricePerKg}
+                  </Text>
+                  {savings > 0 && (
+                    <View style={s.offerSavingsBadge}>
+                      <Text style={s.offerSavingsText}>Save LKR {savings}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+
+            <Pressable
+              onPress={handleAdd}
+              style={({ pressed }) => [
+                s.offerAddBtn,
+                justAdded ? s.offerAddBtnSuccess : null,
+                pressed && s.btnPressed,
+              ]}
+            >
+              {justAdded ? (
+                <Check size={14} color="#FFFFFF" strokeWidth={2.5} />
+              ) : (
+                <Plus size={14} color="#1F5C3A" strokeWidth={2.5} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </Pressable>
+
+      {isSellerModalOpen && (
+        <SellerProfileModal
+          farmerId={listing.farmerId}
+          isOpen={isSellerModalOpen}
+          onClose={() => setIsSellerModalOpen(false)}
+          initialCropName={listing.cropName}
+        />
+      )}
+    </View>
+  );
+};
+
+// ===================== DISCOUNTED CARD COMPONENT =====================
+const DiscountCard: React.FC<{ listing: Listing }> = ({ listing }) => {
+  const { addToCart, goToSubScreen } = useApp();
+  const [justAdded, setJustAdded] = useState(false);
+  const [isSellerModalOpen, setIsSellerModalOpen] = useState(false);
+  const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
+
+  const handleAdd = (e?: any) => {
+    e?.stopPropagation?.();
+    addToCart(listing, 1);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1500);
+  };
+
+  const discountVal = listing.discountPercent || (
+    listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg
+      ? Math.round(((listing.originalPricePerKg - listing.pricePerKg) / listing.originalPricePerKg) * 100)
+      : 20
+  );
+
+  return (
+    <View style={s.discountCardWrapper}>
+      <Pressable
+        onPress={() => goToSubScreen('product_detail', { listingId: listing._id })}
+        style={({ pressed }) => [s.discountCard, pressed && s.btnPressed]}
+      >
+        <View style={s.discountMediaArea}>
+          {hasPhoto ? (
+            <Image source={{ uri: listing.photos[0] }} style={s.discountPhoto} resizeMode="cover" />
+          ) : (
+            <ProduceVisual type={listing.cropName} size="md" />
+          )}
+
+          {/* Discount Percentage Badge */}
+          <View style={s.discountPercentBadge}>
+            <Text style={s.discountPercentText}>-{discountVal}%</Text>
+          </View>
+
+          {/* Rating */}
+          <View style={s.discountRatingBadge}>
+            <Star size={9} color="#F59E0B" fill="#F59E0B" />
+            <Text style={s.discountRatingText}>{listing.farmerRating.toFixed(1)}</Text>
+          </View>
+        </View>
+
+        <View style={s.discountBody}>
+          <View style={s.discountLocationRow}>
+            <MapPin size={9.5} color="#1F5C3A" />
+            <Text style={s.discountLocationText} numberOfLines={1}>
+              {listing.location.town}
+            </Text>
+          </View>
+
+          <Text style={s.discountCropTitle} numberOfLines={1}>
+            {listing.cropName}
+          </Text>
+
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              setIsSellerModalOpen(true);
+            }}
+          >
+            <Text style={s.discountFarmerName} numberOfLines={1}>
+              {listing.farmerName}
+            </Text>
+          </Pressable>
+
+          <View style={s.discountPriceBottomRow}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
+                <Text style={s.discountPriceValue}>
+                  LKR {listing.pricePerKg.toLocaleString()}
+                </Text>
+                <Text style={s.discountPriceUnit}>/kg</Text>
+              </View>
+              {listing.originalPricePerKg && (
+                <Text style={s.discountOriginalPrice}>
+                  LKR {listing.originalPricePerKg}
+                </Text>
+              )}
+            </View>
+
+            <Pressable
+              onPress={handleAdd}
+              style={({ pressed }) => [
+                s.discountAddBtn,
+                justAdded ? s.discountAddBtnSuccess : null,
+                pressed && s.btnPressed,
+              ]}
+            >
+              {justAdded ? (
+                <Check size={13} color="#FFFFFF" strokeWidth={2.5} />
+              ) : (
+                <Plus size={13} color="#DC2626" strokeWidth={2.5} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </Pressable>
+
+      {isSellerModalOpen && (
+        <SellerProfileModal
+          farmerId={listing.farmerId}
+          isOpen={isSellerModalOpen}
+          onClose={() => setIsSellerModalOpen(false)}
+          initialCropName={listing.cropName}
+        />
+      )}
+    </View>
+  );
+};
+
 // ===================== 1. BUYER HOME SCREEN =====================
 export const BuyerHomeScreen: React.FC = () => {
   const { listings, goToSubScreen } = useApp();
@@ -83,6 +326,7 @@ export const BuyerHomeScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [selectedSectionFilter, setSelectedSectionFilter] = useState<'all' | 'offers' | 'discounted' | 'farmers'>('all');
 
   // Filter state
   const [maxPrice, setMaxPrice] = useState<number>(800);
@@ -155,25 +399,59 @@ export const BuyerHomeScreen: React.FC = () => {
     });
   };
 
-  const filteredListings = listings.filter(l => {
-    const matchCategory = selectedCategory === 'All' || l.category === selectedCategory;
-    const matchSearch = isMatchingSearch(l, searchQuery);
-    const matchPrice = l.pricePerKg <= maxPrice;
-    const matchDistrict = selectedDistrict === 'All' || l.location.district === selectedDistrict;
-    const matchOrganic = !onlyOrganic || l.isOrganic;
+  // Base filtered list of all farmer listings
+  const filteredListings = useMemo(() => {
+    return listings.filter(l => {
+      const matchCategory = selectedCategory === 'All' || l.category === selectedCategory;
+      const matchSearch = isMatchingSearch(l, searchQuery);
+      const matchPrice = l.pricePerKg <= maxPrice;
+      const matchDistrict = selectedDistrict === 'All' || l.location.district === selectedDistrict;
+      const matchOrganic = !onlyOrganic || l.isOrganic;
 
-    let matchMinOrder = true;
-    if (minOrderFilter === 'small') matchMinOrder = l.minOrderKg <= 5;
-    else if (minOrderFilter === 'medium') matchMinOrder = l.minOrderKg <= 10;
-    else if (minOrderFilter === 'bulk') matchMinOrder = l.minOrderKg >= 15;
+      let matchMinOrder = true;
+      if (minOrderFilter === 'small') matchMinOrder = l.minOrderKg <= 5;
+      else if (minOrderFilter === 'medium') matchMinOrder = l.minOrderKg <= 10;
+      else if (minOrderFilter === 'bulk') matchMinOrder = l.minOrderKg >= 15;
 
-    return matchCategory && matchSearch && matchPrice && matchDistrict && matchOrganic && matchMinOrder && l.status === 'active';
-  }).sort((a, b) => {
-    if (sortBy === 'price_asc') return a.pricePerKg - b.pricePerKg;
-    if (sortBy === 'price_desc') return b.pricePerKg - a.pricePerKg;
-    if (sortBy === 'qty_desc') return b.quantityKg - a.quantityKg;
-    return b.farmerRating - a.farmerRating;
-  });
+      return matchCategory && matchSearch && matchPrice && matchDistrict && matchOrganic && matchMinOrder && l.status === 'active';
+    }).sort((a, b) => {
+      if (sortBy === 'price_asc') return a.pricePerKg - b.pricePerKg;
+      if (sortBy === 'price_desc') return b.pricePerKg - a.pricePerKg;
+      if (sortBy === 'qty_desc') return b.quantityKg - a.quantityKg;
+      return b.farmerRating - a.farmerRating;
+    });
+  }, [listings, selectedCategory, searchQuery, maxPrice, selectedDistrict, onlyOrganic, minOrderFilter, sortBy]);
+
+  // Special Offer Listings
+  const offerListings = useMemo(() => {
+    return listings
+      .filter(l => {
+        const isOfferItem = Boolean(l.isOffer || (l.offerBadge && l.offerBadge.length > 0));
+        const matchSearch = isMatchingSearch(l, searchQuery);
+        const matchCat = selectedCategory === 'All' || l.category === selectedCategory;
+        const matchDist = selectedDistrict === 'All' || l.location.district === selectedDistrict;
+        const matchOrganic = !onlyOrganic || l.isOrganic;
+        return isOfferItem && l.status === 'active' && matchSearch && matchCat && matchDist && matchOrganic;
+      })
+      .sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+  }, [listings, searchQuery, selectedCategory, selectedDistrict, onlyOrganic]);
+
+  // Discounted Items
+  const discountedListings = useMemo(() => {
+    return listings
+      .filter(l => {
+        const isDiscounted = Boolean(
+          (l.discountPercent && l.discountPercent > 0) ||
+          (l.originalPricePerKg && l.originalPricePerKg > l.pricePerKg)
+        );
+        const matchSearch = isMatchingSearch(l, searchQuery);
+        const matchCat = selectedCategory === 'All' || l.category === selectedCategory;
+        const matchDist = selectedDistrict === 'All' || l.location.district === selectedDistrict;
+        const matchOrganic = !onlyOrganic || l.isOrganic;
+        return isDiscounted && l.status === 'active' && matchSearch && matchCat && matchDist && matchOrganic;
+      })
+      .sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+  }, [listings, searchQuery, selectedCategory, selectedDistrict, onlyOrganic]);
 
   const activeFiltersCount =
     (selectedDistrict !== 'All' ? 1 : 0) +
@@ -193,7 +471,12 @@ export const BuyerHomeScreen: React.FC = () => {
   };
 
   return (
-    <ScrollView style={s.mainScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+    <View style={{ flex: 1, backgroundColor: '#F8FAF8' }}>
+      <ScrollView
+        style={s.mainScroll}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Search Bar & Filter Header */}
       <View style={{ paddingHorizontal: horizontalPadding, paddingTop: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -257,27 +540,69 @@ export const BuyerHomeScreen: React.FC = () => {
           })}
         </ScrollView>
 
-        {/* Category Chips */}
+        {/* Section Quick Jump Filter Bar */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={{ marginTop: 8 }}
+          style={{ marginTop: 6 }}
           contentContainerStyle={{ paddingVertical: 4, gap: 8 }}
         >
-          {categories.map(cat => (
-            <View key={cat}>
-              <Chip
-                label={cat}
-                selected={selectedCategory === cat}
-                onPress={() => setSelectedCategory(cat)}
-              />
-            </View>
-          ))}
+          <Pressable
+            onPress={() => setSelectedSectionFilter('all')}
+            style={({ pressed }) => [
+              s.jumpChip,
+              selectedSectionFilter === 'all' && s.jumpChipActive,
+              pressed && s.btnPressed,
+            ]}
+          >
+            <Text style={[s.jumpChipText, selectedSectionFilter === 'all' && s.jumpChipTextActive]}>
+              🌟 All Sections
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSelectedSectionFilter('offers')}
+            style={({ pressed }) => [
+              s.jumpChip,
+              selectedSectionFilter === 'offers' && s.jumpChipActive,
+              pressed && s.btnPressed,
+            ]}
+          >
+            <Flame size={12} color={selectedSectionFilter === 'offers' ? '#fff' : '#EA580C'} />
+            <Text style={[s.jumpChipText, selectedSectionFilter === 'offers' && s.jumpChipTextActive]}>
+              Special Offers ({offerListings.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSelectedSectionFilter('discounted')}
+            style={({ pressed }) => [
+              s.jumpChip,
+              selectedSectionFilter === 'discounted' && s.jumpChipActive,
+              pressed && s.btnPressed,
+            ]}
+          >
+            <Tag size={12} color={selectedSectionFilter === 'discounted' ? '#fff' : '#DC2626'} />
+            <Text style={[s.jumpChipText, selectedSectionFilter === 'discounted' && s.jumpChipTextActive]}>
+              Discounted ({discountedListings.length})
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setSelectedSectionFilter('farmers')}
+            style={({ pressed }) => [
+              s.jumpChip,
+              selectedSectionFilter === 'farmers' && s.jumpChipActive,
+              pressed && s.btnPressed,
+            ]}
+          >
+            <MapPin size={12} color={selectedSectionFilter === 'farmers' ? '#fff' : '#1F5C3A'} />
+            <Text style={[s.jumpChipText, selectedSectionFilter === 'farmers' && s.jumpChipTextActive]}>
+              Farmers Listings ({filteredListings.length})
+            </Text>
+          </Pressable>
         </ScrollView>
       </View>
 
       {/* Featured Promo Banner */}
-      {!searchQuery && (
+      {!searchQuery && selectedSectionFilter === 'all' && (
         <View style={{ paddingHorizontal: horizontalPadding, marginTop: 12 }}>
           <View style={s.promoBanner}>
             <View style={s.promoTag}>
@@ -300,44 +625,163 @@ export const BuyerHomeScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Product Grid */}
-      <View style={{ paddingHorizontal: horizontalPadding, paddingTop: 16 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
-            Available Harvest ({filteredListings.length})
-          </Text>
-          <Pressable
-            onPress={() => goToSubScreen('market_prices')}
-            style={({ pressed }) => [s.benchmarkBtn, pressed && s.btnPressed]}
-          >
-            <View style={s.liveGreenDot} />
-            <TrendingUp size={13} color="#1F5C3A" />
-            <Text style={s.benchmarkBtnText}>Wholesale Rates</Text>
-          </Pressable>
-        </View>
+      {/* ============================================================== */}
+      {/* 1. SPECIAL OFFER LISTINGS SECTION */}
+      {/* ============================================================== */}
+      {(selectedSectionFilter === 'all' || selectedSectionFilter === 'offers') && offerListings.length > 0 && (
+        <View style={s.sectionBlock}>
+          <View style={s.sectionHeaderRow}>
+            <View style={s.sectionTitleWithIcon}>
+              <View style={s.iconBadgeOffers}>
+                <Flame size={18} color="#EA580C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionTitleMain}>Special Offer Listings</Text>
+                <Text style={s.sectionSubtitleText}>
+                  Direct farm bundles, bulk packages & limited deals
+                </Text>
+              </View>
+            </View>
+            <View style={s.pillBadgeOffers}>
+              <Text style={s.pillBadgeOffersText}>{offerListings.length} Offers</Text>
+            </View>
+          </View>
 
-        {filteredListings.length === 0 ? (
-          <EmptyState
-            title="No Produce Found"
-            description="Try changing your crop search or reset your filter criteria."
-            actionLabel="Reset All Filters"
-            onAction={() => {
-              setSearchQuery('');
-              resetAllFilters();
-            }}
-          />
-        ) : (
-          <View style={[s.productGrid, { gap: cardGap }]}>
-            {filteredListings.map(listing => (
-              <View key={listing._id} style={{ width: cardWidth }}>
-                <ProductCard listing={listing} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: horizontalPadding, gap: 12, paddingVertical: 4 }}
+          >
+            {offerListings.map(item => (
+              <OfferCard key={item._id} listing={item} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ============================================================== */}
+      {/* 2. DISCOUNTED ITEMS SECTION */}
+      {/* ============================================================== */}
+      {(selectedSectionFilter === 'all' || selectedSectionFilter === 'discounted') && discountedListings.length > 0 && (
+        <View style={s.sectionBlock}>
+          <View style={s.sectionHeaderRow}>
+            <View style={s.sectionTitleWithIcon}>
+              <View style={s.iconBadgeDiscount}>
+                <Tag size={18} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionTitleMain}>Discounted Items</Text>
+                <Text style={s.sectionSubtitleText}>
+                  Direct farm-gate harvests marked down up to 30% below market
+                </Text>
+              </View>
+            </View>
+            <View style={s.pillBadgeDiscount}>
+              <Text style={s.pillBadgeDiscountText}>Up to 30% OFF</Text>
+            </View>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: horizontalPadding, gap: 12, paddingVertical: 4 }}
+          >
+            {discountedListings.map(item => (
+              <DiscountCard key={item._id} listing={item} />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ============================================================== */}
+      {/* 3. DIRECT FARMERS LISTINGS SECTION */}
+      {/* ============================================================== */}
+      {(selectedSectionFilter === 'all' || selectedSectionFilter === 'farmers') && (
+        <View style={s.sectionBlock}>
+          <View style={s.sectionHeaderRow}>
+            <View style={s.sectionTitleWithIcon}>
+              <View style={s.iconBadgeFarmers}>
+                <MapPin size={18} color="#1F5C3A" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sectionTitleMain}>Direct Farmers Listings</Text>
+                <Text style={s.sectionSubtitleText}>
+                  Freshly harvested produce direct from certified local growers
+                </Text>
+              </View>
+            </View>
+            <Pressable
+              onPress={() => goToSubScreen('market_prices')}
+              style={({ pressed }) => [s.benchmarkBtn, pressed && s.btnPressed]}
+            >
+              <View style={s.liveGreenDot} />
+              <TrendingUp size={13} color="#1F5C3A" />
+              <Text style={s.benchmarkBtnText}>Wholesale Rates</Text>
+            </Pressable>
+          </View>
+
+          {/* Category Chips for Farmers Listings */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginBottom: 12 }}
+            contentContainerStyle={{ paddingHorizontal: horizontalPadding, gap: 8 }}
+          >
+            {categories.map(cat => (
+              <View key={cat}>
+                <Chip
+                  label={cat}
+                  selected={selectedCategory === cat}
+                  onPress={() => setSelectedCategory(cat)}
+                />
               </View>
             ))}
-          </View>
-        )}
-      </View>
+          </ScrollView>
 
-      {/* Filter BottomSheet */}
+          {filteredListings.length === 0 ? (
+            <View style={{ paddingHorizontal: horizontalPadding, paddingVertical: 12 }}>
+              <EmptyState
+                title="No Produce Found"
+                description="Try changing your crop search or reset your filter criteria."
+                actionLabel="Reset All Filters"
+                onAction={() => {
+                  setSearchQuery('');
+                  resetAllFilters();
+                }}
+              />
+            </View>
+          ) : (
+            <View style={{ paddingHorizontal: horizontalPadding }}>
+              <View style={[s.productGrid, { gap: cardGap }]}>
+                {filteredListings.map(listing => (
+                  <View key={listing._id} style={{ width: cardWidth }}>
+                    <ProductCard listing={listing} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+          {filteredListings.length > 0 && (
+            <View style={{ paddingHorizontal: horizontalPadding, marginTop: 14 }}>
+              <View style={s.catalogFooter}>
+                <View style={s.catalogFooterIconBox}>
+                  <CheckCircle2 size={16} color="#1F5C3A" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.catalogFooterTitle}>All Farm Gate Listings Loaded</Text>
+                  <Text style={s.catalogFooterSubtitle}>
+                    Showing all {filteredListings.length} verified produce batches · Freshly harvested
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+    </ScrollView>
+
+    {/* Filter BottomSheet rendered outside ScrollView */}
+    {isFilterOpen && (
       <BottomSheet
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
@@ -413,7 +857,8 @@ export const BuyerHomeScreen: React.FC = () => {
           </Pressable>
         </View>
       </BottomSheet>
-    </ScrollView>
+    )}
+  </View>
   );
 };
 
@@ -3179,6 +3624,454 @@ const s = StyleSheet.create({
   mainScroll: {
     flex: 1,
     backgroundColor: '#F8FAF8',
+  },
+  // Section Headers & Titles
+  sectionBlock: {
+    paddingTop: 18,
+  },
+  sectionHeaderRow: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sectionTitleWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  iconBadgeOffers: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FED7AA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBadgeDiscount: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBadgeFarmers: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    backgroundColor: '#E6F2E8',
+    borderWidth: 1.5,
+    borderColor: '#CDE5D2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitleMain: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  sectionSubtitleText: {
+    fontSize: 11.5,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+  pillBadgeOffers: {
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: '#EA580C',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  pillBadgeOffersText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  pillBadgeDiscount: {
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  pillBadgeDiscountText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  catalogFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F1F6F2',
+    borderWidth: 1,
+    borderColor: '#D4E6D8',
+    borderRadius: 14,
+    padding: 12,
+  },
+  catalogFooterIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#E6F2E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  catalogFooterTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1F5C3A',
+  },
+  catalogFooterSubtitle: {
+    fontSize: 10.5,
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 1,
+  },
+
+  // Jump filter chips
+  jumpChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  jumpChipActive: {
+    backgroundColor: '#1F5C3A',
+    borderColor: '#1F5C3A',
+  },
+  jumpChipText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  jumpChipTextActive: {
+    color: '#FFFFFF',
+  },
+
+  // Offer Cards
+  offerCardWrapper: {
+    flexShrink: 0,
+  },
+  offerCard: {
+    width: 250,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#FFEDD5',
+    overflow: 'hidden',
+    shadowColor: '#EA580C',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  offerMediaArea: {
+    position: 'relative',
+    width: '100%',
+    height: 120,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  offerPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  offerRibbon: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    zIndex: 2,
+    shadowColor: '#EA580C',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  offerRibbonText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  offerRatingBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2.5,
+    zIndex: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  offerRatingText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  offerBody: {
+    padding: 11,
+  },
+  offerLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 2,
+  },
+  offerLocationText: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  offerCropTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  offerFarmerName: {
+    fontSize: 11,
+    color: '#1F5C3A',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  offerDealTagline: {
+    fontSize: 10,
+    color: '#C2410C',
+    fontWeight: '700',
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  offerPriceBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  offerPriceValue: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#EA580C',
+  },
+  offerPriceUnit: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  offerOriginalPrice: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+  },
+  offerSavingsBadge: {
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  offerSavingsText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+  offerAddBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FED7AA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offerAddBtnSuccess: {
+    backgroundColor: '#1F5C3A',
+    borderColor: '#1F5C3A',
+  },
+
+  // Discount Cards
+  discountCardWrapper: {
+    flexShrink: 0,
+  },
+  discountCard: {
+    width: 175,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    overflow: 'hidden',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  discountMediaArea: {
+    position: 'relative',
+    width: '100%',
+    height: 105,
+    backgroundColor: '#FEF2F2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  discountPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  discountPercentBadge: {
+    position: 'absolute',
+    top: 7,
+    left: 7,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    zIndex: 2,
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  discountPercentText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+  },
+  discountRatingBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    zIndex: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  discountRatingText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  discountBody: {
+    padding: 9,
+  },
+  discountLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 2,
+  },
+  discountLocationText: {
+    fontSize: 9.5,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  discountCropTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 1,
+  },
+  discountFarmerName: {
+    fontSize: 10,
+    color: '#1F5C3A',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  discountPriceBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  discountPriceValue: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#DC2626',
+  },
+  discountPriceUnit: {
+    fontSize: 9,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  discountOriginalPrice: {
+    fontSize: 9.5,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    fontWeight: '600',
+  },
+  discountAddBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FECACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  discountAddBtnSuccess: {
+    backgroundColor: '#1F5C3A',
+    borderColor: '#1F5C3A',
   },
   btnPressed: {
     opacity: 0.85,

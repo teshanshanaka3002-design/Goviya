@@ -59,6 +59,11 @@ export interface Listing {
   quantityKg: number;
   minOrderKg: number;
   pricePerKg: number; // in LKR
+  originalPricePerKg?: number; // Pre-discount price
+  discountPercent?: number; // Discount percentage (e.g. 20, 25)
+  isOffer?: boolean; // Promotional or bundle offer
+  offerBadge?: string; // e.g. "Special Offer", "Weekend Deal", "Bulk Saver"
+  offerTitle?: string; // e.g. "Hill Country Harvest Deal"
   harvestDate: string;
   photos: string[];
   description: string;
