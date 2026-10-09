@@ -160,7 +160,7 @@ export const AdminDashboardScreen: React.FC = () => {
                 <Card padding="md" style={{ gap: 10 }}>
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center gap-2.5 flex-1">
-                      <Avatar name={user.name} size="md" role={user.role} />
+                      <Avatar name={user.name} size="md" role={user.role} imageUrl={user.avatarUrl} />
                       <View className="flex-1">
                         <Text className="text-xs font-bold text-[#1A1A1A]">{user.name}</Text>
                         <Text className="text-[10px] text-[#6B7280]">

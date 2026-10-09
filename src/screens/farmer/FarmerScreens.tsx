@@ -38,6 +38,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Input } from '../../components/ui/Input';
 import { Avatar } from '../../components/ui/Avatar';
+import { DEFAULT_FARMER_AVATAR } from '../../services/farmerAvatarData';
 import { Order, OrderStatus, Listing } from '../../types';
 import { FarmerOrdersScreen } from './FarmerOrdersScreen';
 import { FarmerMarketPriceTrendsScreen } from './FarmerMarketPriceTrendsScreen';
@@ -50,7 +51,7 @@ import {
 export const HARVEST_PHOTO_PRESETS = [
   {
     title: 'Fresh Orange Carrots',
-    url: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5c317?w=600&auto=format&fit=crop&q=80',
+    url: 'https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&auto=format&fit=crop&q=80',
     tag: 'Carrots',
   },
   {
@@ -84,7 +85,7 @@ export const FARMER_AVATAR_PRESETS = [
   {
     id: 'av_1',
     label: 'Sunil (Highland)',
-    url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    url: DEFAULT_FARMER_AVATAR,
   },
   {
     id: 'av_2',
@@ -131,7 +132,7 @@ export const FarmerHomeScreen: React.FC = () => {
               name={currentUser?.name || 'Sunil Bandara'}
               size="lg"
               role="farmer"
-              imageUrl={currentUser?.avatarUrl}
+              imageUrl={currentUser?.avatarUrl || currentFarmer?.avatarUrl || DEFAULT_FARMER_AVATAR}
             />
             <View className="flex-1">
               <View className="flex-row items-center gap-1.5">
@@ -1415,7 +1416,7 @@ export const FarmerProfileScreen: React.FC = () => {
   const farmSizeAcres = currentUser?.farmSizeAcres ?? currentFarmer?.farmSizeAcres ?? 4.5;
   const rating = currentUser?.rating || currentFarmer?.rating || 4.9;
   const totalRatings = currentUser?.totalRatings || currentFarmer?.totalRatings || 128;
-  const avatarUrl = currentUser?.avatarUrl || currentFarmer?.avatarUrl;
+  const avatarUrl = currentUser?.avatarUrl || currentFarmer?.avatarUrl || DEFAULT_FARMER_AVATAR;
   const isVerified = currentUser?.verified ?? currentFarmer?.verified ?? true;
 
   // Edit Profile Modal State
@@ -1428,7 +1429,7 @@ export const FarmerProfileScreen: React.FC = () => {
   const [editDistrict, setEditDistrict] = useState(district);
   const [editYearsFarming, setEditYearsFarming] = useState(yearsFarming.toString());
   const [editFarmSize, setEditFarmSize] = useState(farmSizeAcres.toString());
-  const [editAvatarUrl, setEditAvatarUrl] = useState(avatarUrl || '');
+  const [editAvatarUrl, setEditAvatarUrl] = useState(avatarUrl || DEFAULT_FARMER_AVATAR);
   const [editSuccessMsg, setEditSuccessMsg] = useState(false);
 
   const handleOpenEdit = () => {
@@ -1440,7 +1441,7 @@ export const FarmerProfileScreen: React.FC = () => {
     setEditDistrict(district);
     setEditYearsFarming(yearsFarming.toString());
     setEditFarmSize(farmSizeAcres.toString());
-    setEditAvatarUrl(avatarUrl || '');
+    setEditAvatarUrl(avatarUrl || DEFAULT_FARMER_AVATAR);
     setIsEditModalOpen(true);
   };
 

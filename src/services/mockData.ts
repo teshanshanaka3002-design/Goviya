@@ -9,6 +9,7 @@ import {
   PlatformStat,
   CropCategory,
 } from '../types';
+import { DEFAULT_FARMER_AVATAR, GAMINI_FARMER_AVATAR, KAVINDA_FARMER_AVATAR } from './farmerAvatarData';
 
 export const mockUsers: User[] = [
   {
@@ -17,6 +18,7 @@ export const mockUsers: User[] = [
     name: 'Sunil Bandara',
     phone: '+94 77 123 4567',
     email: 'sunil.bandara@goviya.lk',
+    avatarUrl: DEFAULT_FARMER_AVATAR,
     location: {
       lat: 6.9697,
       lng: 80.7891,
@@ -39,6 +41,7 @@ export const mockUsers: User[] = [
     name: 'K. Sivalingam',
     phone: '+94 71 890 1234',
     email: 'sivalingam.k@goviya.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 9.6615,
       lng: 80.0255,
@@ -60,6 +63,7 @@ export const mockUsers: User[] = [
     name: 'Priyani Samarasinghe',
     phone: '+94 76 543 2198',
     email: 'priyani.s@goviya.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 7.8731,
       lng: 80.6511,
@@ -81,6 +85,7 @@ export const mockUsers: User[] = [
     name: 'Bandula Wijesinghe',
     phone: '+94 77 456 7890',
     email: 'bandula.w@goviya.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 6.8485,
       lng: 79.9575,
@@ -102,6 +107,7 @@ export const mockUsers: User[] = [
     name: 'Kusumawathi Jayasinghe',
     phone: '+94 71 678 9012',
     email: 'kusum.agri@goviya.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 6.8520,
       lng: 79.9540,
@@ -123,7 +129,7 @@ export const mockUsers: User[] = [
     name: 'Gamini Dissanayake',
     phone: '+94 77 889 0011',
     email: 'gamini.d@dambullafarm.lk',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    avatarUrl: GAMINI_FARMER_AVATAR,
     location: {
       lat: 7.8604,
       lng: 80.6517,
@@ -143,8 +149,15 @@ export const mockUsers: User[] = [
       {
         id: 'doc_nic',
         type: 'nic_front',
-        title: 'National Identity Card (Smart NIC)',
+        title: 'National Identity Card (Front)',
         url: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
+        issuedDate: '2018-04-12',
+      },
+      {
+        id: 'doc_nic_b',
+        type: 'nic_back',
+        title: 'National Identity Card (Back)',
+        url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&auto=format&fit=crop&q=80',
         issuedDate: '2018-04-12',
       },
       {
@@ -161,6 +174,13 @@ export const mockUsers: User[] = [
         url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80',
         issuedDate: '2021-08-30',
       },
+      {
+        id: 'doc_breg',
+        type: 'business_reg',
+        title: 'Provincial Agri Business Registration',
+        url: 'https://images.unsplash.com/photo-1568234928966-359c35dd8327?w=600&auto=format&fit=crop&q=80',
+        issuedDate: '2022-03-14',
+      },
     ],
   },
   {
@@ -169,7 +189,7 @@ export const mockUsers: User[] = [
     name: 'Kavinda Wickramatunga',
     phone: '+94 71 223 3445',
     email: 'kavinda.w@highland.lk',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
+    avatarUrl: KAVINDA_FARMER_AVATAR,
     location: {
       lat: 7.0425,
       lng: 80.8654,
@@ -189,8 +209,15 @@ export const mockUsers: User[] = [
       {
         id: 'doc_nic_2',
         type: 'nic_front',
-        title: 'National Identity Card (Front & Back)',
+        title: 'National Identity Card (Front)',
         url: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80',
+        issuedDate: '2020-02-18',
+      },
+      {
+        id: 'doc_nic_2_b',
+        type: 'nic_back',
+        title: 'National Identity Card (Back)',
+        url: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&auto=format&fit=crop&q=80',
         issuedDate: '2020-02-18',
       },
       {
@@ -200,6 +227,20 @@ export const mockUsers: User[] = [
         url: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?w=600&auto=format&fit=crop&q=80',
         issuedDate: '2026-08-20',
       },
+      {
+        id: 'doc_deed_2',
+        type: 'farm_deed',
+        title: 'Agrarian Land Ownership Title Certificate',
+        url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80',
+        issuedDate: '2021-11-10',
+      },
+      {
+        id: 'doc_breg_2',
+        type: 'business_reg',
+        title: 'Walapane Cooperative Farm Enterprise Certificate',
+        url: 'https://images.unsplash.com/photo-1568234928966-359c35dd8327?w=600&auto=format&fit=crop&q=80',
+        issuedDate: '2023-01-15',
+      },
     ],
   },
   {
@@ -208,6 +249,7 @@ export const mockUsers: User[] = [
     name: 'Dinesh Wickramasinghe',
     phone: '+94 77 345 6789',
     email: 'dinesh.w@colombofresh.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 6.9271,
       lng: 79.8612,
@@ -225,6 +267,7 @@ export const mockUsers: User[] = [
     name: 'Kumuduni Senanayake',
     phone: '+94 72 987 6543',
     email: 'kumuduni.s@gmail.com',
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 7.2906,
       lng: 80.6337,
@@ -242,6 +285,7 @@ export const mockUsers: User[] = [
     name: 'Roshan Kaluarachchi',
     phone: '+94 78 234 5678',
     email: 'roshan.logistics@goviya.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 7.084,
       lng: 80.0098,
@@ -261,6 +305,7 @@ export const mockUsers: User[] = [
     name: 'Dr. Niluka Jayawardena',
     phone: '+94 11 254 9000',
     email: 'niluka.admin@goviya.lk',
+    avatarUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&auto=format&fit=crop&q=80',
     location: {
       lat: 6.9271,
       lng: 79.8612,
@@ -290,7 +335,7 @@ export const mockListings: Listing[] = [
     offerBadge: 'Special Offer',
     offerTitle: 'Hill Country Harvest Deal',
     harvestDate: '2026-10-04',
-    photos: ['carrots'],
+    photos: ['https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&auto=format&fit=crop&q=80'],
     description: 'Crisp, sweet mountain carrots freshly harvested at 1,800m altitude in Kandapola. Washed with pure natural spring water.',
     status: 'active',
     location: {
@@ -313,7 +358,7 @@ export const mockListings: Listing[] = [
     minOrderKg: 20,
     pricePerKg: 420,
     harvestDate: '2026-10-03',
-    photos: ['onions'],
+    photos: ['https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=600&auto=format&fit=crop&q=80'],
     description: 'Cured Jaffna red soil shallots with strong aroma and long shelf life. Excellent for commercial kitchen and grocery retail.',
     status: 'active',
     location: {
@@ -341,7 +386,7 @@ export const mockListings: Listing[] = [
     offerBadge: 'Hot Deal',
     offerTitle: 'Dawn-Picked Spice Special',
     harvestDate: '2026-10-05',
-    photos: ['chillies'],
+    photos: ['https://images.unsplash.com/photo-1588252303782-cb80119abd6d?w=600&auto=format&fit=crop&q=80'],
     description: 'High pungency grade A green chillies. Picked early morning to guarantee firmness and vibrant green color.',
     status: 'active',
     location: {
@@ -366,7 +411,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 320,
     discountPercent: 25,
     harvestDate: '2026-10-04',
-    photos: ['leeks'],
+    photos: ['https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&auto=format&fit=crop&q=80'],
     description: 'Tender white stalks with dark green tops. Packed in breathable 25kg field crates for zero spoilage during transport.',
     status: 'active',
     location: {
@@ -389,7 +434,7 @@ export const mockListings: Listing[] = [
     minOrderKg: 15,
     pricePerKg: 310,
     harvestDate: '2026-10-05',
-    photos: ['tomatoes'],
+    photos: ['https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop&q=80'],
     description: 'Firm, sun-ripened greenhouse tomatoes. Semi-ripe stage suitable for 4-day transit with high solid content.',
     status: 'active',
     location: {
@@ -417,7 +462,7 @@ export const mockListings: Listing[] = [
     offerBadge: 'Bundle Deal',
     offerTitle: 'Sweet Papaya Bulk Box',
     harvestDate: '2026-10-02',
-    photos: ['papaya'],
+    photos: ['https://images.unsplash.com/photo-1617112848923-cc2234396a8d?w=600&auto=format&fit=crop&q=80'],
     description: 'Deep salmon-red flesh with high brix sweetness. Average fruit weight 1.5 - 2.0 kg each, packed carefully in foam socks.',
     status: 'active',
     location: {
@@ -442,7 +487,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 290,
     discountPercent: 24,
     harvestDate: '2026-10-06',
-    photos: ['brinjal'],
+    photos: ['https://images.unsplash.com/photo-1615485290382-441e4d049cb5?w=600&auto=format&fit=crop&q=80'],
     description: 'Glossy purple, tender fresh brinjals freshly plucked this morning in Pannipitiya. Zero chemical sprays, pure organic compost fed.',
     status: 'active',
     location: {
@@ -467,7 +512,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 180,
     discountPercent: 22,
     harvestDate: '2026-10-06',
-    photos: ['mukunuwenna'],
+    photos: ['https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=600&auto=format&fit=crop&q=80'],
     description: 'Lush, clean fresh Sri Lankan indigenous leafy greens cultivated in pure well water in Pannipitiya. Packed crisp in breathable bunches.',
     status: 'active',
     location: {
@@ -492,7 +537,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 230,
     discountPercent: 22,
     harvestDate: '2026-10-06',
-    photos: ['okra'],
+    photos: ['https://images.unsplash.com/photo-1425543103986-22abb7d7e8d2?w=600&auto=format&fit=crop&q=80'],
     description: 'Young and crisp tender green okra without tough fiber. Plucked at peak tenderness for daily markets and restaurants.',
     status: 'active',
     location: {
@@ -517,7 +562,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 250,
     discountPercent: 22,
     harvestDate: '2026-10-05',
-    photos: ['gourd'],
+    photos: ['https://images.unsplash.com/photo-1597362925123-77861d3fbac7?w=600&auto=format&fit=crop&q=80'],
     description: 'Straight, uniform organic snake gourd grown on elevated trellises in Pannipitiya. Plump, hydrating, and freshly harvested.',
     status: 'active',
     location: {
@@ -545,7 +590,7 @@ export const mockListings: Listing[] = [
     offerBadge: 'Special Offer',
     offerTitle: 'Chef Select Baby Veg Offer',
     harvestDate: '2026-10-06',
-    photos: ['carrots'],
+    photos: ['https://images.unsplash.com/photo-1447175008436-054170c2e979?w=600&auto=format&fit=crop&q=80'],
     description: 'Sweet, tender baby carrots with green tops attached. Ideal for supermarkets, fine dining, and organic retail.',
     status: 'active',
     location: {
@@ -570,7 +615,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 280,
     discountPercent: 21,
     harvestDate: '2026-10-05',
-    photos: ['carrots'],
+    photos: ['https://images.unsplash.com/photo-1582515073490-39981397c445?w=600&auto=format&fit=crop&q=80'],
     description: 'Commercial wholesale washed carrots in ventilated 50kg crates. Bulk commercial grade from Dambulla agricultural hub.',
     status: 'active',
     location: {
@@ -593,7 +638,7 @@ export const mockListings: Listing[] = [
     minOrderKg: 5,
     pricePerKg: 360,
     harvestDate: '2026-10-07',
-    photos: ['carrots'],
+    photos: ['https://images.unsplash.com/photo-1522184216316-3c25379f9760?w=600&auto=format&fit=crop&q=80'],
     description: 'Zero-soil hydroponically grown sweet carrots in Pannipitiya greenhouse. Extra crispy, 100% chemical spray free.',
     status: 'active',
     location: {
@@ -618,7 +663,7 @@ export const mockListings: Listing[] = [
     originalPricePerKg: 320,
     discountPercent: 19,
     harvestDate: '2026-10-06',
-    photos: ['carrots'],
+    photos: ['https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&auto=format&fit=crop&q=80'],
     description: 'Thick, crunchy jumbo soup carrots harvested from organic peat soil in Hakgala valley. High natural brix sugar content.',
     status: 'active',
     location: {
@@ -646,7 +691,7 @@ export const mockListings: Listing[] = [
     offerBadge: 'Special Offer',
     offerTitle: 'Authentic Jaffna Sun-Cured',
     harvestDate: '2026-10-04',
-    photos: ['chillies'],
+    photos: ['https://images.unsplash.com/photo-1590595906931-81f04f0ccebb?w=600&auto=format&fit=crop&q=80'],
     description: 'Authentic Jaffna peninsula sun-dried whole red chillies with high pungency and deep red color. Cleaned and graded.',
     status: 'active',
     location: {
@@ -674,7 +719,7 @@ export const mockListings: Listing[] = [
     offerBadge: 'Seasonal Offer',
     offerTitle: 'Chunnakam Direct Harvest',
     harvestDate: '2026-10-06',
-    photos: ['gourd'],
+    photos: ['https://images.unsplash.com/photo-1594282486552-05b4d80fbb9f?w=600&auto=format&fit=crop&q=80'],
     description: 'Tender fresh Jaffna drumsticks harvested from deep red earth soils. Rich in iron and nutrients, unblemished pods.',
     status: 'active',
     location: {
@@ -707,7 +752,7 @@ export const mockOrders: Order[] = [
         listingId: 'list_1',
         cropName: 'Nuwara Eliya Fresh Carrots',
         category: 'Vegetables',
-        photoUrl: 'carrots',
+        photoUrl: 'https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&auto=format&fit=crop&q=80',
         quantityKg: 40,
         pricePerKg: 280,
       },
@@ -715,7 +760,7 @@ export const mockOrders: Order[] = [
         listingId: 'list_4',
         cropName: 'Upcountry Leeks (Prasanna Variety)',
         category: 'Vegetables',
-        photoUrl: 'leeks',
+        photoUrl: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&auto=format&fit=crop&q=80',
         quantityKg: 25,
         pricePerKg: 240,
       },
@@ -755,7 +800,7 @@ export const mockOrders: Order[] = [
         listingId: 'list_2',
         cropName: 'Jaffna Premium Red Onions',
         category: 'Vegetables',
-        photoUrl: 'onions',
+        photoUrl: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=600&auto=format&fit=crop&q=80',
         quantityKg: 50,
         pricePerKg: 420,
       },
@@ -791,7 +836,7 @@ export const mockOrders: Order[] = [
         listingId: 'list_3',
         cropName: 'Galewela Green Chillies (Amu Miris)',
         category: 'Spices & Herbs',
-        photoUrl: 'chillies',
+        photoUrl: 'https://images.unsplash.com/photo-1588252303782-cb80119abd6d?w=600&auto=format&fit=crop&q=80',
         quantityKg: 15,
         pricePerKg: 640,
       },
@@ -833,7 +878,7 @@ export const mockOrders: Order[] = [
         listingId: 'list_1',
         cropName: 'Nuwara Eliya Fresh Carrots',
         category: 'Vegetables',
-        photoUrl: 'carrots',
+        photoUrl: 'https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&auto=format&fit=crop&q=80',
         quantityKg: 30,
         pricePerKg: 280,
       },
@@ -881,7 +926,7 @@ export const mockOrders: Order[] = [
         listingId: 'list_13',
         cropName: 'Pannipitiya Greenhouse Sweet Carrots',
         category: 'Vegetables',
-        photoUrl: 'carrots',
+        photoUrl: 'https://images.unsplash.com/photo-1522184216316-3c25379f9760?w=600&auto=format&fit=crop&q=80',
         quantityKg: 20,
         pricePerKg: 360,
       },
@@ -955,7 +1000,7 @@ export const mockChatMessages: ChatMessage[] = [
     listingData: {
       cropName: 'Nuwara Eliya Fresh Carrots',
       pricePerKg: 280,
-      photo: 'carrots',
+      photo: 'https://images.unsplash.com/photo-1590868309235-ea34bed7bd7f?w=600&auto=format&fit=crop&q=80',
     },
     sentAt: '2026-10-05T08:15:00Z',
   },
@@ -1130,8 +1175,8 @@ export const mockComplaints: Complaint[] = [
     status: 'pending',
     createdAt: '2026-10-04T12:00:00Z',
     evidencePhotos: [
-      'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop&q=80',
-      'https://images.unsplash.com/photo-1598170845058-32b9d6a5c317?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1588252303782-cb80119abd6d?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80',
     ],
   },
   {
@@ -1148,6 +1193,7 @@ export const mockComplaints: Complaint[] = [
     createdAt: '2026-10-03T09:45:00Z',
     evidencePhotos: [
       'https://images.unsplash.com/photo-1594282486552-05b4d80fbb9f?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=600&auto=format&fit=crop&q=80',
     ],
   },
   {
@@ -1165,6 +1211,7 @@ export const mockComplaints: Complaint[] = [
     createdAt: '2026-09-28T16:20:00Z',
     evidencePhotos: [
       'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=600&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1587049352846-4a222e784d38?w=600&auto=format&fit=crop&q=80',
     ],
   },
 ];
@@ -1175,6 +1222,7 @@ export const mockCategories: CropCategory[] = [
     name: 'Vegetables',
     description: 'Fresh highland & lowland vegetables, leafy greens, root veggies, pumpkins, and gourds.',
     iconName: 'Carrot',
+    iconUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=300&auto=format&fit=crop&q=80',
     itemCount: 142,
     createdAt: '2024-01-01T00:00:00Z',
   },
@@ -1183,6 +1231,7 @@ export const mockCategories: CropCategory[] = [
     name: 'Fruits',
     description: 'Tropical Ceylon fruits including bananas, papayas, mangoes, pineapples, and passion fruit.',
     iconName: 'Apple',
+    iconUrl: 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=300&auto=format&fit=crop&q=80',
     itemCount: 88,
     createdAt: '2024-01-01T00:00:00Z',
   },
@@ -1191,6 +1240,7 @@ export const mockCategories: CropCategory[] = [
     name: 'Spices & Herbs',
     description: 'Pure Ceylon cinnamon, black pepper, cardamom, cloves, and fiery bird-eye chillies.',
     iconName: 'Flame',
+    iconUrl: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=300&auto=format&fit=crop&q=80',
     itemCount: 64,
     createdAt: '2024-01-01T00:00:00Z',
   },
@@ -1199,6 +1249,7 @@ export const mockCategories: CropCategory[] = [
     name: 'Grains & Rice',
     description: 'Traditional heirloom rice varieties (Suwandel, Kalu Heenati), kurakkan, maize, and pulses.',
     iconName: 'Wheat',
+    iconUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=300&auto=format&fit=crop&q=80',
     itemCount: 53,
     createdAt: '2024-01-01T00:00:00Z',
   },
@@ -1207,6 +1258,7 @@ export const mockCategories: CropCategory[] = [
     name: 'Tubers & Roots',
     description: 'Highland red potatoes, Nuwara Eliya potatoes, manioc, sweet potatoes, and yams.',
     iconName: 'Bean',
+    iconUrl: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=300&auto=format&fit=crop&q=80',
     itemCount: 39,
     createdAt: '2024-01-01T00:00:00Z',
   },

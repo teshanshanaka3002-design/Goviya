@@ -23,6 +23,7 @@ import {
   mockPlatformStats,
   mockCategories,
 } from './mockData';
+import { DEFAULT_FARMER_AVATAR, GAMINI_FARMER_AVATAR, KAVINDA_FARMER_AVATAR } from './farmerAvatarData';
 import {
   db,
   doc,
@@ -198,7 +199,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'user');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { /* ignore */ }
+      try {
+        const u = JSON.parse(saved);
+        if (u && u._id === 'user_farmer_1' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
+          u.avatarUrl = DEFAULT_FARMER_AVATAR;
+        }
+        return u;
+      } catch (e) { /* ignore */ }
     }
     return null; // Guest buyer initially: visitors can view the buyer marketplace without signup or login!
   });
@@ -226,9 +233,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!saved) return mockUsers;
     try {
       const parsed: User[] = JSON.parse(saved);
-      const existingIds = new Set(parsed.map(u => u._id));
+      const updated = parsed.map(u => {
+        if (u._id === 'user_farmer_1' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
+          return { ...u, avatarUrl: DEFAULT_FARMER_AVATAR };
+        }
+        if (u._id === 'user_pending_1' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
+          return { ...u, avatarUrl: GAMINI_FARMER_AVATAR };
+        }
+        if (u._id === 'user_pending_2' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
+          return { ...u, avatarUrl: KAVINDA_FARMER_AVATAR };
+        }
+        return u;
+      });
+      const existingIds = new Set(updated.map(u => u._id));
       const missingMocks = mockUsers.filter(u => !existingIds.has(u._id));
-      return [...parsed, ...missingMocks];
+      return [...updated, ...missingMocks];
     } catch (e) {
       return mockUsers;
     }
