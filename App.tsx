@@ -50,7 +50,9 @@ const MainNavigator: React.FC = () => {
     >
       <StatusBar style={isAuthScreen ? 'light' : 'dark'} />
       <View style={styles.container}>
-        {!isAuthScreen && <AppHeader />}
+        {!isAuthScreen &&
+          navState.subScreen !== 'market_price_trends' &&
+          navState.subScreen !== 'current_market_price' && <AppHeader />}
         <View style={styles.content}>
           {renderRoleScreen()}
         </View>

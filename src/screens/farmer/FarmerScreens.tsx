@@ -40,6 +40,7 @@ import { Input } from '../../components/ui/Input';
 import { Avatar } from '../../components/ui/Avatar';
 import { Order, OrderStatus, Listing } from '../../types';
 import { FarmerOrdersScreen } from './FarmerOrdersScreen';
+import { FarmerMarketPriceTrendsScreen } from './FarmerMarketPriceTrendsScreen';
 import {
   pickImageFromGallery,
   captureImageWithCamera,
@@ -180,16 +181,35 @@ export const FarmerHomeScreen: React.FC = () => {
           </Card>
         </View>
 
-        {/* Action Button */}
-        <Button
-          variant="primary"
-          fullWidth
-          size="lg"
-          leftIcon={<Plus size={18} color="#ffffff" />}
-          onPress={() => goToSubScreen('add_listing')}
-        >
-          Post New Crop Harvest
-        </Button>
+        {/* Action Buttons */}
+        <View style={{ gap: 10 }}>
+          <Button
+            variant="primary"
+            fullWidth
+            size="lg"
+            leftIcon={<Plus size={18} color="#ffffff" />}
+            onPress={() => goToSubScreen('add_listing')}
+          >
+            Post New Crop Harvest
+          </Button>
+
+          <Button
+            variant="outline"
+            fullWidth
+            size="lg"
+            leftIcon={<TrendingUp size={18} color="#1F5C3A" />}
+            style={{
+              backgroundColor: '#EAF3EC',
+              borderColor: '#1F5C3A',
+              borderWidth: 1.5,
+            }}
+            onPress={() => goToSubScreen('market_price_trends')}
+          >
+            <Text style={{ color: '#1F5C3A', fontWeight: '800', fontSize: 14 }}>
+              Current Market Price
+            </Text>
+          </Button>
+        </View>
 
         {/* Pending Action Required Orders */}
         {pendingOrders.length > 0 && (
@@ -1898,6 +1918,13 @@ export const FarmerScreens: React.FC = () => {
 
   if (navState.subScreen === 'add_listing') {
     return <FarmerAddListingScreen />;
+  }
+
+  if (
+    navState.subScreen === 'market_price_trends' ||
+    navState.subScreen === 'current_market_price'
+  ) {
+    return <FarmerMarketPriceTrendsScreen />;
   }
 
   if (navState.activeTab === 'orders') return <FarmerOrdersScreen />;
