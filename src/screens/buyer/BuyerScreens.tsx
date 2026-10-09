@@ -51,10 +51,13 @@ import {
   Tag,
   Flame,
   Percent,
+  Compass,
 } from 'lucide-react-native';
 import { useApp, db, doc, onSnapshot } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
 import { SriLankaMap } from '../../components/shared/SriLankaMap';
+import { GoogleMapNearbyView } from '../../components/shared/GoogleMapNearbyView';
+import { BuyerFilterModal } from '../../components/shared/BuyerFilterModal';
 import { Input, SearchBar } from '../../components/ui/Input';
 import { Chip } from '../../components/ui/Chip';
 import { Button } from '../../components/ui/Button';
@@ -328,8 +331,14 @@ export const BuyerHomeScreen: React.FC = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedSectionFilter, setSelectedSectionFilter] = useState<'all' | 'offers' | 'discounted' | 'farmers'>('all');
 
-  // Filter state
-  const [maxPrice, setMaxPrice] = useState<number>(800);
+  // Filter state matching UI design
+  const [filterCategories, setFilterCategories] = useState<string[]>(['Vegetables', 'Fruits']);
+  const [minPrice, setMinPrice] = useState<number>(50);
+  const [maxPrice, setMaxPrice] = useState<number>(1000);
+  const [distanceKm, setDistanceKm] = useState<number>(25);
+  const [showAvailableOnly, setShowAvailableOnly] = useState<boolean>(true);
+  const [includeOutOfStock, setIncludeOutOfStock] = useState<boolean>(false);
+  const [filterSortBy, setFilterSortBy] = useState<'nearest' | 'price_asc' | 'price_desc'>('nearest');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('All');
   const [onlyOrganic, setOnlyOrganic] = useState<boolean>(false);
   const [minOrderFilter, setMinOrderFilter] = useState<'all' | 'small' | 'medium' | 'bulk'>('all');
@@ -402,25 +411,45 @@ export const BuyerHomeScreen: React.FC = () => {
   // Base filtered list of all farmer listings
   const filteredListings = useMemo(() => {
     return listings.filter(l => {
-      const matchCategory = selectedCategory === 'All' || l.category === selectedCategory;
+      // Category match: if filterCategories has items, check if l.category matches or maps to category
+      let matchCategory = true;
+      if (filterCategories.length > 0) {
+        matchCategory = filterCategories.some(cat => {
+          if (cat === 'Vegetables') return l.category === 'Vegetables';
+          if (cat === 'Fruits') return l.category === 'Fruits';
+          if (cat === 'Root Crops') {
+            return l.category === 'Tubers' || l.cropName.toLowerCase().includes('potato') || l.cropName.toLowerCase().includes('carrot');
+          }
+          if (cat === 'Leafy Greens') {
+            return l.category === 'Vegetables' || l.cropName.toLowerCase().includes('leek') || l.cropName.toLowerCase().includes('cabbage') || l.cropName.toLowerCase().includes('mukunuwenna');
+          }
+          return l.category.toLowerCase().includes(cat.toLowerCase());
+        });
+      } else if (selectedCategory !== 'All') {
+        matchCategory = l.category === selectedCategory;
+      }
+
       const matchSearch = isMatchingSearch(l, searchQuery);
-      const matchPrice = l.pricePerKg <= maxPrice;
+      const matchPrice = l.pricePerKg >= minPrice && l.pricePerKg <= maxPrice;
       const matchDistrict = selectedDistrict === 'All' || l.location.district === selectedDistrict;
       const matchOrganic = !onlyOrganic || l.isOrganic;
+      const matchAvailability = includeOutOfStock ? true : (showAvailableOnly ? l.status === 'active' && l.quantityKg > 0 : l.status === 'active');
 
       let matchMinOrder = true;
       if (minOrderFilter === 'small') matchMinOrder = l.minOrderKg <= 5;
       else if (minOrderFilter === 'medium') matchMinOrder = l.minOrderKg <= 10;
       else if (minOrderFilter === 'bulk') matchMinOrder = l.minOrderKg >= 15;
 
-      return matchCategory && matchSearch && matchPrice && matchDistrict && matchOrganic && matchMinOrder && l.status === 'active';
+      return matchCategory && matchSearch && matchPrice && matchDistrict && matchOrganic && matchAvailability && matchMinOrder && l.status !== 'removed';
     }).sort((a, b) => {
+      if (filterSortBy === 'price_asc') return a.pricePerKg - b.pricePerKg;
+      if (filterSortBy === 'price_desc') return b.pricePerKg - a.pricePerKg;
       if (sortBy === 'price_asc') return a.pricePerKg - b.pricePerKg;
       if (sortBy === 'price_desc') return b.pricePerKg - a.pricePerKg;
       if (sortBy === 'qty_desc') return b.quantityKg - a.quantityKg;
       return b.farmerRating - a.farmerRating;
     });
-  }, [listings, selectedCategory, searchQuery, maxPrice, selectedDistrict, onlyOrganic, minOrderFilter, sortBy]);
+  }, [listings, filterCategories, selectedCategory, searchQuery, minPrice, maxPrice, selectedDistrict, onlyOrganic, showAvailableOnly, includeOutOfStock, minOrderFilter, filterSortBy, sortBy]);
 
   // Special Offer Listings
   const offerListings = useMemo(() => {
@@ -454,17 +483,24 @@ export const BuyerHomeScreen: React.FC = () => {
   }, [listings, searchQuery, selectedCategory, selectedDistrict, onlyOrganic]);
 
   const activeFiltersCount =
+    (filterCategories.length > 0 && filterCategories.length < 4 ? 1 : 0) +
+    (minPrice > 50 || maxPrice < 1000 ? 1 : 0) +
+    (distanceKm !== 25 ? 1 : 0) +
+    (!showAvailableOnly || includeOutOfStock ? 1 : 0) +
+    (filterSortBy !== 'nearest' ? 1 : 0) +
     (selectedDistrict !== 'All' ? 1 : 0) +
-    (onlyOrganic ? 1 : 0) +
-    (maxPrice < 800 ? 1 : 0) +
-    (minOrderFilter !== 'all' ? 1 : 0) +
-    (sortBy !== 'rating' ? 1 : 0) +
-    (selectedCategory !== 'All' ? 1 : 0);
+    (onlyOrganic ? 1 : 0);
 
   const resetAllFilters = () => {
     setSelectedCategory('All');
+    setFilterCategories(['Vegetables', 'Fruits']);
+    setMinPrice(50);
+    setMaxPrice(1000);
+    setDistanceKm(25);
+    setShowAvailableOnly(true);
+    setIncludeOutOfStock(false);
+    setFilterSortBy('nearest');
     setSelectedDistrict('All');
-    setMaxPrice(800);
     setOnlyOrganic(false);
     setMinOrderFilter('all');
     setSortBy('rating');
@@ -780,84 +816,33 @@ export const BuyerHomeScreen: React.FC = () => {
       )}
     </ScrollView>
 
-    {/* Filter BottomSheet rendered outside ScrollView */}
-    {isFilterOpen && (
-      <BottomSheet
-        isOpen={isFilterOpen}
-        onClose={() => setIsFilterOpen(false)}
-        title="Filter Produce Listings"
-        footer={
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button variant="outline" style={{ flex: 1 }} onPress={resetAllFilters}>
-              Reset
-            </Button>
-            <Button variant="primary" style={{ flex: 1 }} onPress={() => setIsFilterOpen(false)}>
-              {`Show (${filteredListings.length})`}
-            </Button>
-          </View>
-        }
-      >
-        <View style={{ gap: 16 }}>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-            {`Max Price: LKR ${maxPrice}/kg`}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {[200, 400, 600, 800].map(p => (
-              <Pressable
-                key={p}
-                onPress={() => setMaxPrice(p)}
-                style={({ pressed }) => [
-                  s.priceChip,
-                  maxPrice === p
-                    ? { backgroundColor: '#E6F2E8', borderColor: '#1F5C3A' }
-                    : { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
-                  pressed && s.btnPressed,
-                ]}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '700', color: maxPrice === p ? '#1F5C3A' : '#1E293B' }}>
-                  {`LKR ${p}`}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-            District Origin
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {['All', 'Nuwara Eliya', 'Matale', 'Kandy', 'Jaffna', 'Badulla', 'Colombo'].map(d => (
-              <Pressable
-                key={d}
-                onPress={() => setSelectedDistrict(d)}
-                style={({ pressed }) => [
-                  s.optionChip,
-                  selectedDistrict === d
-                    ? { backgroundColor: '#1F5C3A', borderColor: '#1F5C3A' }
-                    : { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' },
-                  pressed && s.btnPressed,
-                ]}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: selectedDistrict === d ? '#ffffff' : '#334155' }}>
-                  {d}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Pressable
-            onPress={() => setOnlyOrganic(!onlyOrganic)}
-            style={s.checkboxRow}
-          >
-            <View style={[s.checkbox, onlyOrganic && s.checkboxChecked]}>
-              {onlyOrganic && <Check size={12} color="#ffffff" strokeWidth={3} />}
-            </View>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
-              Organic Certified Only
-            </Text>
-          </Pressable>
-        </View>
-      </BottomSheet>
-    )}
+    {/* Filter Modal matching requested UI style */}
+    <BuyerFilterModal
+      isOpen={isFilterOpen}
+      onClose={() => setIsFilterOpen(false)}
+      selectedCategories={filterCategories}
+      onToggleCategory={cat => {
+        setFilterCategories(prev =>
+          prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
+        );
+      }}
+      minPrice={minPrice}
+      maxPrice={maxPrice}
+      onChangePriceRange={(min, max) => {
+        setMinPrice(min);
+        setMaxPrice(max);
+      }}
+      distanceKm={distanceKm}
+      onChangeDistance={km => setDistanceKm(km)}
+      showAvailableOnly={showAvailableOnly}
+      onToggleAvailableOnly={() => setShowAvailableOnly(prev => !prev)}
+      includeOutOfStock={includeOutOfStock}
+      onToggleIncludeOutOfStock={() => setIncludeOutOfStock(prev => !prev)}
+      sortBy={filterSortBy}
+      onChangeSortBy={sort => setFilterSortBy(sort)}
+      onClearAll={resetAllFilters}
+      resultsCount={filteredListings.length}
+    />
   </View>
   );
 };
@@ -1185,6 +1170,7 @@ export const BuyerNearbyScreen: React.FC = () => {
   const [filterType, setFilterType] = useState<'all' | 'farmers' | 'vegetables'>('all');
   const [selectedFarmerModalId, setSelectedFarmerModalId] = useState<string | null>(null);
   const [selectedMapMarkerId, setSelectedMapMarkerId] = useState<string | null>(null);
+  const [mapMode, setMapMode] = useState<'google' | 'island'>('google');
 
   const presetLocations = [
     { label: 'All Island', value: '' },
@@ -1477,11 +1463,92 @@ export const BuyerNearbyScreen: React.FC = () => {
 
         {/* Interactive Map View */}
         <View style={{ gap: 8 }}>
-          <SriLankaMap
-            markers={mapMarkers}
-            selectedId={selectedMapMarkerId}
-            onSelectMarker={id => setSelectedMapMarkerId(id)}
-          />
+          {/* Map View Mode Switcher */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <Pressable
+                onPress={() => setMapMode('google')}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 16,
+                    backgroundColor: mapMode === 'google' ? '#1F5C3A' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: mapMode === 'google' ? '#1F5C3A' : '#E2E8F0',
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <MapPin size={11} color={mapMode === 'google' ? '#FFFFFF' : '#1F5C3A'} />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '800',
+                    color: mapMode === 'google' ? '#FFFFFF' : '#334155',
+                  }}
+                >
+                  Real Google Map
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setMapMode('island')}
+                style={({ pressed }) => [
+                  {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 16,
+                    backgroundColor: mapMode === 'island' ? '#1F5C3A' : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: mapMode === 'island' ? '#1F5C3A' : '#E2E8F0',
+                  },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Compass size={11} color={mapMode === 'island' ? '#FFFFFF' : '#64748B'} />
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: mapMode === 'island' ? '#FFFFFF' : '#64748B',
+                  }}
+                >
+                  Agri Hubs Overview
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={s.liveGreenDot} />
+              <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#166534' }}>
+                GPS Live
+              </Text>
+            </View>
+          </View>
+
+          {mapMode === 'google' ? (
+            <GoogleMapNearbyView
+              markers={mapMarkers}
+              selectedId={selectedMapMarkerId}
+              onSelectMarker={id => setSelectedMapMarkerId(id)}
+              searchQuery={searchLocation}
+              onOpenChat={(id, name) => handleChat(id, name)}
+            />
+          ) : (
+            <SriLankaMap
+              markers={mapMarkers}
+              selectedId={selectedMapMarkerId}
+              onSelectMarker={id => setSelectedMapMarkerId(id)}
+            />
+          )}
+
           <View
             style={{
               flexDirection: 'row',
