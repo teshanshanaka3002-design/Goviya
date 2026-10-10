@@ -48,6 +48,9 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
 import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
+import { DriverOrderDetailInteractiveMap } from '../../components/driver/DriverOrderDetailInteractiveMap';
+import { DriverHomeInteractiveMap } from '../../components/driver/DriverHomeInteractiveMap';
+import { resolveCoordinates, openExternalGoogleMapsNavigation } from '../../services/locationService';
 import { Order } from '../../types';
 
 // Helper: Open Google Maps for a given location or query
@@ -201,13 +204,45 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
 
           {/* Driver's current location button option */}
           <Pressable
-            onPress={() =>
-              openGoogleMaps(
-                currentUser?.location?.address || 'Kadawatha Logistics Hub, Western Province',
-                currentUser?.location?.lat || 7.084,
-                currentUser?.location?.lng || 80.0098
-              )
-            }
+            onPress={() => {
+              const isPickedUp = order.status === 'out_for_delivery' || order.status === 'delivered';
+              const farmerLoc = resolveCoordinates(
+                order.pickupLocation,
+                order.pickupLocation?.district || order.farmerAddress,
+                order.farmerAddress,
+                { lat: 6.9697, lng: 80.7891 }
+              );
+              const buyerLoc = resolveCoordinates(
+                (order as any).deliveryLocation,
+                order.deliveryDistrict,
+                order.deliveryAddress,
+                { lat: 6.9271, lng: 79.8612 }
+              );
+              const driverLoc = resolveCoordinates(
+                currentUser?.location,
+                currentUser?.district || currentUser?.location?.district,
+                currentUser?.location?.town || currentUser?.location?.address,
+                { lat: 7.084, lng: 80.0098 }
+              );
+
+              if (!isPickedUp) {
+                openExternalGoogleMapsNavigation({
+                  originLat: driverLoc.lat,
+                  originLng: driverLoc.lng,
+                  destLat: farmerLoc.lat,
+                  destLng: farmerLoc.lng,
+                  destAddress: order.pickupLocation?.address || order.farmerAddress,
+                });
+              } else {
+                openExternalGoogleMapsNavigation({
+                  originLat: driverLoc.lat,
+                  originLng: driverLoc.lng,
+                  destLat: buyerLoc.lat,
+                  destLng: buyerLoc.lng,
+                  destAddress: order.deliveryAddress,
+                });
+              }
+            }}
             className="flex-row items-center justify-between mt-2 p-2.5 rounded-xl bg-[#F0FDF4] border border-[#BBF7D0]"
           >
             <View className="flex-row items-center gap-2">
@@ -220,9 +255,9 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
           </Pressable>
         </Card>
 
-        {/* Complete Live Route Corridor Map (Farm Gate -> Fleet Driver -> Buyer Doorstep) */}
+        {/* Real Interactive Route Map (Farm Gate -> Fleet Driver -> Buyer Doorstep) */}
         <View style={{ borderRadius: 16, overflow: 'hidden' }}>
-          <OrderLiveRouteMap order={order} height={230} />
+          <DriverOrderDetailInteractiveMap order={order} height={230} />
         </View>
 
         {/* 1. PICKUP POINT (FARMER) */}
@@ -1690,21 +1725,7 @@ export const DriverHomeScreen: React.FC = () => {
           <Text className="text-xs font-black text-[#1A1A1A] uppercase tracking-wide">
             Transit Corridors & Waypoints
           </Text>
-          <SriLankaMap
-            showRoute
-            routeTitle="Highland to Western Province Dispatch"
-            markers={orders
-              .filter(o => o.deliveryType !== 'pickup' && (o.status === 'ready_for_pickup' || o.status === 'out_for_delivery'))
-              .map(o => ({
-                id: o._id,
-                name: o.farmerName,
-                district: o.deliveryDistrict,
-                town: o.farmerAddress,
-                lat: 6.9697,
-                lng: 80.7891,
-                type: 'driver',
-              }))}
-          />
+          <DriverHomeInteractiveMap orders={orders} height={240} />
         </View>
       </View>
     </ScrollView>

@@ -18,12 +18,15 @@ import {
 import { Role } from '../../types';
 import { useApp } from '../../services/store';
 
+import { useLanguage } from '../../i18n';
+
 export interface BottomNavProps {
   role: Role;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
   const { currentUser, navState, setTab, cart, orders, complaints, users } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const currentTab = navState.activeTab;
 
@@ -38,15 +41,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
 
   const tabsConfig = {
     buyer: [
-      { id: 'home', label: 'Home', icon: Home },
-      { id: 'nearby', label: 'Nearby', icon: MapPin },
+      { id: 'home', label: t('nav.home', 'Home'), icon: Home },
+      { id: 'nearby', label: t('nav.nearby', 'Nearby'), icon: MapPin },
       {
         id: 'cart',
-        label: 'Cart',
+        label: t('nav.cart', 'Cart'),
         icon: ShoppingCart,
         badge: cart.length > 0 ? cart.length : undefined,
       },
-      { id: 'profile', label: currentUser ? 'Profile' : 'Account', icon: User },
+      { id: 'profile', label: currentUser ? t('nav.profile', 'Profile') : t('nav.account', 'Account'), icon: User },
     ],
     farmer: [
       {

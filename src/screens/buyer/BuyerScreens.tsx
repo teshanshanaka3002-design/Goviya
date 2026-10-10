@@ -73,10 +73,12 @@ import { SellerProfileModal } from '../../components/shared/SellerProfileModal';
 import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
 import { Listing, Order, OrderStatus, SupportTicket, TicketMessage, TicketStatus } from '../../types';
 import { isValidPhotoUrl } from '../../services/imageService';
+import { useLanguage } from '../../i18n';
 
 // ===================== OFFER CARD COMPONENT =====================
 const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
   const { currentUser, openAuth, addToCart, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const [justAdded, setJustAdded] = useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = useState(false);
   const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
@@ -113,7 +115,7 @@ const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
           <View style={s.offerRibbon}>
             <Flame size={10} color="#FFFFFF" />
             <Text style={s.offerRibbonText}>
-              {listing.offerBadge || 'Special Offer'}
+              {listing.offerBadge || t('buyer.home.specialOffers', 'Special Offer')}
             </Text>
           </View>
 
@@ -157,18 +159,18 @@ const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
                 <Text style={s.offerPriceValue}>
-                  LKR {listing.pricePerKg.toLocaleString()}
+                  {t('common.lkr', 'LKR')} {listing.pricePerKg.toLocaleString()}
                 </Text>
-                <Text style={s.offerPriceUnit}>/kg</Text>
+                <Text style={s.offerPriceUnit}>/{t('common.kg', 'kg')}</Text>
               </View>
               {listing.originalPricePerKg && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
                   <Text style={s.offerOriginalPrice}>
-                    LKR {listing.originalPricePerKg}
+                    {t('common.lkr', 'LKR')} {listing.originalPricePerKg}
                   </Text>
                   {savings > 0 && (
                     <View style={s.offerSavingsBadge}>
-                      <Text style={s.offerSavingsText}>Save LKR {savings}</Text>
+                      <Text style={s.offerSavingsText}>{t('buyer.product.saveLkr', 'Save LKR')} {savings}</Text>
                     </View>
                   )}
                 </View>
@@ -208,6 +210,7 @@ const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
 // ===================== DISCOUNTED CARD COMPONENT =====================
 const DiscountCard: React.FC<{ listing: Listing }> = ({ listing }) => {
   const { currentUser, openAuth, addToCart, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const [justAdded, setJustAdded] = useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = useState(false);
   const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
@@ -281,13 +284,13 @@ const DiscountCard: React.FC<{ listing: Listing }> = ({ listing }) => {
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2 }}>
                 <Text style={s.discountPriceValue}>
-                  LKR {listing.pricePerKg.toLocaleString()}
+                  {t('common.lkr', 'LKR')} {listing.pricePerKg.toLocaleString()}
                 </Text>
-                <Text style={s.discountPriceUnit}>/kg</Text>
+                <Text style={s.discountPriceUnit}>/{t('common.kg', 'kg')}</Text>
               </View>
               {listing.originalPricePerKg && (
                 <Text style={s.discountOriginalPrice}>
-                  LKR {listing.originalPricePerKg}
+                  {t('common.lkr', 'LKR')} {listing.originalPricePerKg}
                 </Text>
               )}
             </View>
@@ -325,6 +328,7 @@ const DiscountCard: React.FC<{ listing: Listing }> = ({ listing }) => {
 // ===================== 1. BUYER HOME SCREEN =====================
 export const BuyerHomeScreen: React.FC = () => {
   const { listings, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const { width: windowWidth } = useWindowDimensions();
 
   // Responsive Grid Calculations
@@ -354,6 +358,20 @@ export const BuyerHomeScreen: React.FC = () => {
   const [minOrderFilter, setMinOrderFilter] = useState<'all' | 'small' | 'medium' | 'bulk'>('all');
   const [sortBy, setSortBy] = useState<'rating' | 'price_asc' | 'price_desc' | 'qty_desc'>('rating');
 
+  const categories = ['All', 'Vegetables', 'Fruits', 'Spices & Herbs', 'Grains & Rice', 'Tubers'];
+
+  const getCategoryLabel = (cat: string) => {
+    switch (cat) {
+      case 'All': return t('category.all', 'All');
+      case 'Vegetables': return t('category.vegetables', 'Vegetables');
+      case 'Fruits': return t('category.fruits', 'Fruits');
+      case 'Spices & Herbs': return t('category.spicesHerbs', 'Spices & Herbs');
+      case 'Grains & Rice': return t('category.grainsRice', 'Grains & Rice');
+      case 'Tubers': return t('category.tubers', 'Tubers');
+      default: return cat;
+    }
+  };
+
   const popularProduceSearches = [
     { label: 'Carrots', emoji: '🥕', query: 'carrots' },
     { label: 'Red Onions', emoji: '🧅', query: 'onions' },
@@ -365,8 +383,6 @@ export const BuyerHomeScreen: React.FC = () => {
     { label: 'Mukunuwenna', emoji: '🌱', query: 'mukunuwenna' },
     { label: 'Snake Gourd', emoji: '🌿', query: 'gourd' },
   ];
-
-  const categories = ['All', 'Vegetables', 'Fruits', 'Spices & Herbs', 'Grains & Rice', 'Tubers'];
 
   const normalizeWord = (w: string) => {
     let s = w.toLowerCase().trim();
@@ -552,7 +568,7 @@ export const BuyerHomeScreen: React.FC = () => {
               value={searchQuery}
               onChange={setSearchQuery}
               onClear={() => setSearchQuery('')}
-              placeholder="Search carrots, leeks, onions, farmers, regions..."
+              placeholder={t('buyer.home.searchPlaceholder', 'Search carrots, leeks, onions, farmers, regions...')}
             />
           </View>
           <Pressable
@@ -623,7 +639,7 @@ export const BuyerHomeScreen: React.FC = () => {
             ]}
           >
             <Text style={[s.jumpChipText, selectedSectionFilter === 'all' && s.jumpChipTextActive]}>
-              🌟 All Sections
+              🌟 {t('buyer.home.allListings', 'All Sections')}
             </Text>
           </Pressable>
           <Pressable
@@ -636,7 +652,7 @@ export const BuyerHomeScreen: React.FC = () => {
           >
             <Flame size={12} color={selectedSectionFilter === 'offers' ? '#fff' : '#EA580C'} />
             <Text style={[s.jumpChipText, selectedSectionFilter === 'offers' && s.jumpChipTextActive]}>
-              Special Offers ({offerListings.length})
+              {t('buyer.home.specialOffers', 'Special Offers')} ({offerListings.length})
             </Text>
           </Pressable>
           <Pressable
@@ -649,7 +665,7 @@ export const BuyerHomeScreen: React.FC = () => {
           >
             <Tag size={12} color={selectedSectionFilter === 'discounted' ? '#fff' : '#DC2626'} />
             <Text style={[s.jumpChipText, selectedSectionFilter === 'discounted' && s.jumpChipTextActive]}>
-              Discounted ({discountedListings.length})
+              {t('buyer.home.discounts', 'Discounted')} ({discountedListings.length})
             </Text>
           </Pressable>
           <Pressable
@@ -662,7 +678,7 @@ export const BuyerHomeScreen: React.FC = () => {
           >
             <MapPin size={12} color={selectedSectionFilter === 'farmers' ? '#fff' : '#1F5C3A'} />
             <Text style={[s.jumpChipText, selectedSectionFilter === 'farmers' && s.jumpChipTextActive]}>
-              Farmers Listings ({filteredListings.length})
+              {t('buyer.home.directListings', 'Farmers Listings')} ({filteredListings.length})
             </Text>
           </Pressable>
         </ScrollView>
@@ -703,14 +719,14 @@ export const BuyerHomeScreen: React.FC = () => {
                 <Flame size={18} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.sectionTitleMain}>Special Offer Listings</Text>
+                <Text style={s.sectionTitleMain}>{t('buyer.home.hotDeals', 'Special Offer Listings')}</Text>
                 <Text style={s.sectionSubtitleText}>
                   Direct farm bundles, bulk packages & limited deals
                 </Text>
               </View>
             </View>
             <View style={s.pillBadgeOffers}>
-              <Text style={s.pillBadgeOffersText}>{offerListings.length} Offers</Text>
+              <Text style={s.pillBadgeOffersText}>{offerListings.length} {t('buyer.home.deals', 'Offers')}</Text>
             </View>
           </View>
 
@@ -737,14 +753,14 @@ export const BuyerHomeScreen: React.FC = () => {
                 <Tag size={18} color="#DC2626" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.sectionTitleMain}>Discounted Items</Text>
+                <Text style={s.sectionTitleMain}>{t('buyer.home.discounts', 'Discounted Items')}</Text>
                 <Text style={s.sectionSubtitleText}>
                   Direct farm-gate harvests marked down up to 30% below market
                 </Text>
               </View>
             </View>
             <View style={s.pillBadgeDiscount}>
-              <Text style={s.pillBadgeDiscountText}>Up to 30% OFF</Text>
+              <Text style={s.pillBadgeDiscountText}>{t('buyer.home.discountPercentOff', 'Up to 30% OFF')}</Text>
             </View>
           </View>
 
@@ -771,7 +787,7 @@ export const BuyerHomeScreen: React.FC = () => {
                 <MapPin size={18} color="#1F5C3A" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={s.sectionTitleMain}>Direct Farmers Listings</Text>
+                <Text style={s.sectionTitleMain}>{t('buyer.home.directListings', 'Direct Farmers Listings')}</Text>
                 <Text style={s.sectionSubtitleText}>
                   Freshly harvested produce direct from certified local growers
                 </Text>
@@ -783,7 +799,7 @@ export const BuyerHomeScreen: React.FC = () => {
             >
               <View style={s.liveGreenDot} />
               <TrendingUp size={13} color="#1F5C3A" />
-              <Text style={s.benchmarkBtnText}>Wholesale Rates</Text>
+              <Text style={s.benchmarkBtnText}>{t('buyer.home.wholesaleRates', 'Wholesale Rates')}</Text>
             </Pressable>
           </View>
 
@@ -797,7 +813,7 @@ export const BuyerHomeScreen: React.FC = () => {
             {categories.map(cat => (
               <View key={cat}>
                 <Chip
-                  label={cat}
+                  label={getCategoryLabel(cat)}
                   selected={selectedCategory === cat}
                   onPress={() => setSelectedCategory(cat)}
                 />
@@ -808,9 +824,9 @@ export const BuyerHomeScreen: React.FC = () => {
           {filteredListings.length === 0 ? (
             <View style={{ paddingHorizontal: horizontalPadding, paddingVertical: 12 }}>
               <EmptyState
-                title="No Produce Found"
-                description="Try changing your crop search or reset your filter criteria."
-                actionLabel="Reset All Filters"
+                title={t('buyer.home.noListingsFound', 'No Produce Found')}
+                description={t('buyer.home.clearFilter', 'Try changing your crop search or reset your filter criteria.')}
+                actionLabel={t('buyer.home.clearFilter', 'Reset All Filters')}
                 onAction={() => {
                   setSearchQuery('');
                   resetAllFilters();
@@ -881,6 +897,7 @@ export const BuyerHomeScreen: React.FC = () => {
 // ===================== 2. BUYER PRODUCT DETAIL SCREEN =====================
 export const BuyerProductDetailScreen: React.FC = () => {
   const { currentUser, openAuth, navState, listings, addToCart, goBack, getOrCreateConversation, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const [quantity, setQuantity] = useState<number>(1);
   const [justAdded, setJustAdded] = useState(false);
@@ -949,7 +966,7 @@ export const BuyerProductDetailScreen: React.FC = () => {
 
           {listing.isOrganic && (
             <View style={s.detailOrganicPill}>
-              <Text style={s.detailOrganicText}>100% Organic Certified</Text>
+              <Text style={s.detailOrganicText}>{t('common.organic', '100% Organic Certified')}</Text>
             </View>
           )}
 
@@ -1025,9 +1042,9 @@ export const BuyerProductDetailScreen: React.FC = () => {
 
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 8 }}>
               <Text style={{ fontSize: 24, fontWeight: '900', color: '#1F5C3A' }}>
-                {`LKR ${listing.pricePerKg.toLocaleString()}`}
+                {`${t('common.lkr', 'LKR')} ${listing.pricePerKg.toLocaleString()}`}
               </Text>
-              <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600' }}>/ kg wholesale rate</Text>
+              <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600' }}>/ {t('common.kg', 'kg')}</Text>
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
@@ -1042,8 +1059,8 @@ export const BuyerProductDetailScreen: React.FC = () => {
           <Card padding="md">
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>Order Quantity</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>Starting from 1 kg</Text>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>{t('buyer.product.quantity', 'Order Quantity')}</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>{t('buyer.product.from1kg', 'Starting from 1 kg')}</Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1054,7 +1071,7 @@ export const BuyerProductDetailScreen: React.FC = () => {
                   <Minus size={16} color="#1E293B" strokeWidth={2.5} />
                 </Pressable>
                 <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A', minWidth: 48, textAlign: 'center' }}>
-                  {`${currentQty} kg`}
+                  {`${currentQty} ${t('common.kg', 'kg')}`}
                 </Text>
                 <Pressable
                   onPress={() => setQuantity(prev => prev + 1)}
@@ -1090,16 +1107,16 @@ export const BuyerProductDetailScreen: React.FC = () => {
                       color: currentQty === kg ? '#1F5C3A' : '#475569',
                     }}
                   >
-                    {`${kg}kg`}
+                    {`${kg}${t('common.kg', 'kg')}`}
                   </Text>
                 </Pressable>
               ))}
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-              <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500' }}>Estimated Batch Total:</Text>
+              <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500' }}>{t('buyer.product.totalPrice', 'Estimated Batch Total')}:</Text>
               <Text style={{ fontSize: 17, fontWeight: '900', color: '#1F5C3A' }}>
-                {`LKR ${totalPrice.toLocaleString()}`}
+                {`${t('common.lkr', 'LKR')} ${totalPrice.toLocaleString()}`}
               </Text>
             </View>
           </Card>
@@ -1168,11 +1185,11 @@ export const BuyerProductDetailScreen: React.FC = () => {
       {/* Floating Bottom CTA Bar */}
       <View style={[s.detailFloatingBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={s.detailPriceSummary}>
-          <Text style={s.detailPriceLabel}>TOTAL PRICE</Text>
+          <Text style={s.detailPriceLabel}>{t('buyer.product.totalPrice', 'TOTAL PRICE')}</Text>
           <Text style={s.detailPriceValue} numberOfLines={1}>
-            {`LKR ${totalPrice.toLocaleString()}`}
+            {`${t('common.lkr', 'LKR')} ${totalPrice.toLocaleString()}`}
           </Text>
-          <Text style={s.detailPriceSub}>{`${currentQty} kg harvest`}</Text>
+          <Text style={s.detailPriceSub}>{`${currentQty} ${t('common.kg', 'kg')}`}</Text>
         </View>
 
         <View style={s.detailCtaGroup}>
@@ -1182,7 +1199,7 @@ export const BuyerProductDetailScreen: React.FC = () => {
             leftIcon={justAdded ? <Check size={16} color="#FFFFFF" strokeWidth={2.5} /> : <ShoppingBag size={16} color="#1F5C3A" />}
             onPress={handleAddToCart}
           >
-            {justAdded ? 'Added' : 'Add to Cart'}
+            {justAdded ? t('common.added', 'Added') : t('buyer.product.addToCart', 'Add to Cart')}
           </Button>
 
           <Button
@@ -1191,7 +1208,7 @@ export const BuyerProductDetailScreen: React.FC = () => {
             rightIcon={<ArrowRight size={16} color="#FFFFFF" strokeWidth={2.5} />}
             onPress={handleBuyNow}
           >
-            Buy Now
+            {t('buyer.product.buyNow', 'Buy Now')}
           </Button>
         </View>
       </View>
@@ -1821,6 +1838,7 @@ export const BuyerNearbyScreen: React.FC = () => {
 // ===================== 4. BUYER CART SCREEN =====================
 export const BuyerCartScreen: React.FC = () => {
   const { currentUser, openAuth, cart, updateCartQuantity, removeFromCart, clearCart, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const subtotal = cart.reduce((acc, item) => acc + item.listing.pricePerKg * item.quantityKg, 0);
   const deliveryFee = cart.length > 0 ? 1500 : 0;
   const total = subtotal + deliveryFee;
@@ -1829,9 +1847,9 @@ export const BuyerCartScreen: React.FC = () => {
     return (
       <View style={{ flex: 1, backgroundColor: '#F8FAF8', padding: 16, alignItems: 'center', justifyContent: 'center' }}>
         <EmptyState
-          title="Your Cart is Empty"
-          description="Add fresh produce directly from Sri Lankan farmers to start your order."
-          actionLabel="Explore Marketplace"
+          title={t('buyer.cart.emptyTitle', 'Your Cart is Empty')}
+          description={t('buyer.cart.emptyDesc', 'Add fresh produce directly from Sri Lankan farmers to start your order.')}
+          actionLabel={t('buyer.cart.startShopping', 'Explore Marketplace')}
           onAction={() => goToSubScreen(null)}
         />
       </View>
@@ -1842,9 +1860,9 @@ export const BuyerCartScreen: React.FC = () => {
     <ScrollView style={s.mainScroll} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
       <View style={{ gap: 14 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>Your Harvest Cart</Text>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>{t('buyer.cart.title', 'Your Harvest Cart')}</Text>
           <Pressable onPress={clearCart} style={({ pressed }) => [pressed && s.btnPressed]}>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#DC2626' }}>Clear All</Text>
+            <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#DC2626' }}>{t('buyer.cart.clearCart', 'Clear All')}</Text>
           </Pressable>
         </View>
 
@@ -1874,10 +1892,10 @@ export const BuyerCartScreen: React.FC = () => {
                       {item.listing.cropName}
                     </Text>
                     <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }} numberOfLines={1}>
-                      {`LKR ${item.listing.pricePerKg}/kg · ${item.listing.farmerName}`}
+                      {`${t('common.lkr', 'LKR')} ${item.listing.pricePerKg}/${t('common.kg', 'kg')} · ${item.listing.farmerName}`}
                     </Text>
                     <Text style={{ fontSize: 14, fontWeight: '900', color: '#1F5C3A', marginTop: 4 }}>
-                      {`LKR ${(item.listing.pricePerKg * item.quantityKg).toLocaleString()}`}
+                      {`${t('common.lkr', 'LKR')} ${(item.listing.pricePerKg * item.quantityKg).toLocaleString()}`}
                     </Text>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
@@ -1889,7 +1907,7 @@ export const BuyerCartScreen: React.FC = () => {
                           <Minus size={13} color="#1E293B" strokeWidth={2.5} />
                         </Pressable>
                         <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', minWidth: 36, textAlign: 'center' }}>
-                          {`${item.quantityKg}kg`}
+                          {`${item.quantityKg}${t('common.kg', 'kg')}`}
                         </Text>
                         <Pressable
                           onPress={() => updateCartQuantity(item.listing._id, item.quantityKg + 1)}
@@ -1904,7 +1922,7 @@ export const BuyerCartScreen: React.FC = () => {
                         style={({ pressed }) => [s.cartRemoveBtn, pressed && s.btnPressed]}
                       >
                         <Trash2 size={13} color="#DC2626" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#DC2626' }}>Remove</Text>
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#DC2626' }}>{t('common.cancel', 'Remove')}</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -1918,16 +1936,16 @@ export const BuyerCartScreen: React.FC = () => {
         <Card padding="md">
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <Text style={{ fontSize: 13, color: '#64748B' }}>Harvest Subtotal</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{`LKR ${subtotal.toLocaleString()}`}</Text>
+              <Text style={{ fontSize: 13, color: '#64748B' }}>{t('buyer.cart.subtotal', 'Harvest Subtotal')}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{`${t('common.lkr', 'LKR')} ${subtotal.toLocaleString()}`}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <Text style={{ fontSize: 13, color: '#64748B' }}>Logistics Fleet Delivery</Text>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{`LKR ${deliveryFee.toLocaleString()}`}</Text>
+              <Text style={{ fontSize: 13, color: '#64748B' }}>{t('buyer.cart.deliveryFee', 'Logistics Fleet Delivery')}</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{`${t('common.lkr', 'LKR')} ${deliveryFee.toLocaleString()}`}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-              <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>Total Amount</Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: '#1F5C3A' }}>{`LKR ${total.toLocaleString()}`}</Text>
+              <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>{t('buyer.cart.total', 'Total Amount')}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: '#1F5C3A' }}>{`${t('common.lkr', 'LKR')} ${total.toLocaleString()}`}</Text>
             </View>
           </View>
         </Card>
@@ -1945,7 +1963,7 @@ export const BuyerCartScreen: React.FC = () => {
             goToSubScreen('checkout');
           }}
         >
-          {`Proceed to Checkout (LKR ${total.toLocaleString()})`}
+          {`${t('buyer.cart.proceedToCheckout', 'Proceed to Checkout')} (${t('common.lkr', 'LKR')} ${total.toLocaleString()})`}
         </Button>
       </View>
     </ScrollView>
@@ -1957,6 +1975,7 @@ type CheckoutStep = 'details' | 'cod_confirm' | 'card_form' | 'wallet_form';
 
 export const BuyerCheckoutScreen: React.FC = () => {
   const { cart, currentUser, openAuth, placeOrder, goToSubScreen, goBack } = useApp();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
@@ -2455,7 +2474,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
           </Pressable>
           <View>
             <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
-              Checkout
+              {t('buyer.checkout.title', 'Checkout')}
             </Text>
             <Text style={{ fontSize: 12, color: '#64748B' }}>
               Step 1 of 2: Fulfillment & Payment Choice
@@ -2476,7 +2495,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
             >
               <Truck size={17} color={deliveryMode === 'delivery' ? '#ffffff' : '#475569'} />
               <Text style={[s.segmentTabText, deliveryMode === 'delivery' && s.segmentTabTextActive]}>
-                Doorstep Delivery
+                {t('buyer.checkout.typeDelivery', 'Doorstep Delivery')}
               </Text>
             </Pressable>
 
@@ -2490,7 +2509,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
             >
               <MapPin size={17} color={deliveryMode === 'pickup' ? '#ffffff' : '#475569'} />
               <Text style={[s.segmentTabText, deliveryMode === 'pickup' && s.segmentTabTextActive]}>
-                Farm Gate Pickup
+                {t('buyer.checkout.typePickup', 'Farm Gate Pickup')}
               </Text>
             </Pressable>
           </View>
@@ -2549,7 +2568,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
         {/* Delivery Details Card */}
         <Card padding="md">
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>
-            Recipient Information
+            {t('buyer.checkout.deliveryDetails', 'Recipient Information')}
           </Text>
           <View style={{ gap: 12 }}>
             <Input
@@ -2568,13 +2587,13 @@ export const BuyerCheckoutScreen: React.FC = () => {
             {deliveryMode === 'delivery' && (
               <View style={{ gap: 12 }}>
                 <Input
-                  label="Delivery Address"
+                  label={t('buyer.checkout.deliveryAddress', 'Delivery Address')}
                   value={address}
                   onChangeText={setAddress}
                   placeholder="Street address, city"
                 />
                 <Input
-                  label="District"
+                  label={t('buyer.checkout.deliveryDistrict', 'District')}
                   value={district}
                   onChangeText={setDistrict}
                   placeholder="e.g. Colombo, Kandy"
@@ -2582,7 +2601,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
               </View>
             )}
             <Input
-              label="Delivery Notes (Optional)"
+              label={t('buyer.checkout.deliveryNotes', 'Delivery Notes (Optional)')}
               value={notes}
               onChangeText={setNotes}
               placeholder="Gate code, crate placement..."
@@ -2593,13 +2612,13 @@ export const BuyerCheckoutScreen: React.FC = () => {
         {/* Payment Methods (Only selection - does not place order) */}
         <Card padding="md">
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>
-            Choose Payment Method
+            {t('buyer.checkout.paymentMethod', 'Choose Payment Method')}
           </Text>
           <View style={{ gap: 10 }}>
             {[
-              { id: 'cash_on_delivery', label: 'Cash on Delivery (Farm Gate / Doorstep)', icon: Banknote },
-              { id: 'card', label: 'LankaPay / Visa / Mastercard', icon: CreditCard },
-              { id: 'mobile_wallet', label: 'Mobile Wallet (Genie / eZ Cash)', icon: Smartphone },
+              { id: 'cash_on_delivery', label: t('buyer.checkout.cashOnDelivery', 'Cash on Delivery (Farm Gate / Doorstep)'), icon: Banknote },
+              { id: 'card', label: t('buyer.checkout.cardPayment', 'LankaPay / Visa / Mastercard'), icon: CreditCard },
+              { id: 'mobile_wallet', label: t('buyer.checkout.mobileWallet', 'Mobile Wallet (Genie / eZ Cash)'), icon: Smartphone },
             ].map(m => {
               const Icon = m.icon;
               const isSelected = paymentMethod === m.id;
@@ -2629,7 +2648,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
         {/* Order Summary */}
         <Card padding="md">
           <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 10 }}>
-            Order Summary ({cart.length} produce types)
+            {t('buyer.checkout.orderSummary', 'Order Summary')} ({cart.length} produce types)
           </Text>
           <View style={{ gap: 8 }}>
             {cart.map(item => (
@@ -2638,20 +2657,20 @@ export const BuyerCheckoutScreen: React.FC = () => {
                   {`${item.listing.cropName} (${item.quantityKg}kg)`}
                 </Text>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                  {`LKR ${(item.listing.pricePerKg * item.quantityKg).toLocaleString()}`}
+                  {`${t('common.lkr', 'LKR')} ${(item.listing.pricePerKg * item.quantityKg).toLocaleString()}`}
                 </Text>
               </View>
             ))}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-              <Text style={{ fontSize: 13, color: '#64748B' }}>Delivery Logistics:</Text>
+              <Text style={{ fontSize: 13, color: '#64748B' }}>{t('buyer.cart.deliveryFee', 'Delivery Logistics')}:</Text>
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                {deliveryMode === 'pickup' ? 'FREE (Self-Pickup)' : `LKR ${deliveryFee.toLocaleString()}`}
+                {deliveryMode === 'pickup' ? 'FREE (Self-Pickup)' : `${t('common.lkr', 'LKR')} ${deliveryFee.toLocaleString()}`}
               </Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
-              <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>Grand Total</Text>
+              <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>{t('buyer.cart.total', 'Grand Total')}</Text>
               <Text style={{ fontSize: 18, fontWeight: '900', color: '#1F5C3A' }}>
-                {`LKR ${total.toLocaleString()}`}
+                {`${t('common.lkr', 'LKR')} ${total.toLocaleString()}`}
               </Text>
             </View>
           </View>
@@ -2665,7 +2684,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
           rightIcon={<ArrowRight size={18} color="#FFFFFF" strokeWidth={2.5} />}
           onPress={handleContinueToPayment}
         >
-          {`Continue (LKR ${total.toLocaleString()})`}
+          {`${t('common.confirm', 'Continue')} (${t('common.lkr', 'LKR')} ${total.toLocaleString()})`}
         </Button>
       </View>
     </ScrollView>
@@ -2675,6 +2694,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
 // ===================== 6. BUYER ORDER CONFIRMATION SCREEN =====================
 export const BuyerOrderConfirmationScreen: React.FC = () => {
   const { navState, orders, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const order = orders.find(o => o._id === navState.selectedOrderId) || orders[0];
 
   return (
@@ -2684,11 +2704,11 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
       </View>
 
       <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', marginTop: 16, textAlign: 'center' }}>
-        Order Placed Successfully!
+        {t('buyer.orderConfirm.title', 'Order Placed Successfully!')}
       </Text>
 
       <Text style={{ fontSize: 13.5, color: '#4B6B56', textAlign: 'center', marginTop: 6, lineHeight: 20 }}>
-        Direct notification sent to the farmer to begin fresh dawn harvesting.
+        {t('buyer.orderConfirm.subtitle', 'Direct notification sent to the farmer to begin fresh dawn harvesting.')}
       </Text>
 
       {order && (
@@ -2706,7 +2726,7 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 12.5, color: '#64748B' }}>Total Paid/Payable:</Text>
-              <Text style={{ fontSize: 14, fontWeight: '900', color: '#1F5C3A' }}>{`LKR ${order.total.toLocaleString()}`}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#1F5C3A' }}>{`${t('common.lkr', 'LKR')} ${order.total.toLocaleString()}`}</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <Text style={{ fontSize: 12.5, color: '#64748B' }}>Fulfillment:</Text>
@@ -2759,7 +2779,7 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
           leftIcon={<Truck size={18} color="#ffffff" strokeWidth={2.5} />}
           onPress={() => goToSubScreen('order_tracking', { orderId: order?._id })}
         >
-          Track Live Shipment
+          {t('buyer.orderConfirm.trackOrder', 'Track Live Shipment')}
         </Button>
 
         <Button
@@ -2768,7 +2788,7 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
           size="md"
           onPress={() => goToSubScreen(null)}
         >
-          Back to Marketplace
+          {t('buyer.orderConfirm.continueShopping', 'Back to Marketplace')}
         </Button>
       </View>
     </ScrollView>
@@ -2778,6 +2798,7 @@ export const BuyerOrderConfirmationScreen: React.FC = () => {
 // ===================== 7. BUYER ORDER TRACKING / MY ORDERS SCREEN =====================
 export const BuyerOrderTrackingScreen: React.FC = () => {
   const { orders, navState, buyerConfirmPickup, goToSubScreen, goBack } = useApp();
+  const { t } = useLanguage();
 
   const myOrders = orders;
   const initialActiveOrder = navState.selectedOrderId
@@ -3448,6 +3469,7 @@ export const MarketPricesScreen: React.FC = () => {
 // ===================== 10. BUYER PROFILE SCREEN =====================
 export const BuyerProfileScreen: React.FC = () => {
   const { currentUser, orders, conversations, logout, openAuth, goToSubScreen } = useApp();
+  const { t } = useLanguage();
 
   const buyerOrders = orders.filter(
     o =>
@@ -3562,7 +3584,7 @@ export const BuyerProfileScreen: React.FC = () => {
         {/* 4. PROCUREMENT & TRACKING HUB */}
         <View style={{ gap: 8 }}>
           <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A', paddingHorizontal: 2 }}>
-            Procurement & Tracking Hub
+            {t('buyer.profile.procurementHub', 'Procurement & Tracking Hub')}
           </Text>
 
           <Card padding="none">
@@ -3576,9 +3598,9 @@ export const BuyerProfileScreen: React.FC = () => {
                   <ShoppingBag size={18} color="#1F5C3A" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.profileMenuTitle}>My Orders & Live Dispatch</Text>
+                  <Text style={s.profileMenuTitle}>{t('buyer.profile.myOrders', 'My Orders & Live Dispatch')}</Text>
                   <Text style={s.profileMenuSubtitle}>
-                    {buyerOrders.length} orders placed · Track step-by-step from harvest
+                    {buyerOrders.length} orders · {t('buyer.profile.myOrdersSub', 'Track step-by-step from harvest')}
                   </Text>
                 </View>
               </View>
@@ -3618,9 +3640,9 @@ export const BuyerProfileScreen: React.FC = () => {
                   <TrendingUp size={18} color="#19768A" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.profileMenuTitle}>Official Mandi Daily Rates</Text>
+                  <Text style={s.profileMenuTitle}>{t('buyer.profile.marketPrices', 'Official Mandi Daily Rates')}</Text>
                   <Text style={s.profileMenuSubtitle}>
-                    Colombo, Dambulla & Keppetipola economic center prices
+                    {t('buyer.profile.marketPricesSub', 'Colombo, Dambulla & Keppetipola economic center prices')}
                   </Text>
                 </View>
               </View>
@@ -3639,7 +3661,7 @@ export const BuyerProfileScreen: React.FC = () => {
                   <MapPin size={18} color="#7C3AED" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.profileMenuTitle}>Nearby Producer Holdings</Text>
+                  <Text style={s.profileMenuTitle}>{t('subscreen.nearbyMap', 'Nearby Producer Holdings')}</Text>
                   <Text style={s.profileMenuSubtitle}>
                     Locate registered farmers across 25 Sri Lankan districts
                   </Text>
@@ -3660,9 +3682,9 @@ export const BuyerProfileScreen: React.FC = () => {
                   <LifeBuoy size={18} color="#15803D" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.profileMenuTitle}>Help & Support</Text>
+                  <Text style={s.profileMenuTitle}>{t('buyer.profile.helpSupport', 'Help & Support')}</Text>
                   <Text style={s.profileMenuSubtitle}>
-                    Raise dispute tickets, order inquiries & live chat with support
+                    {t('buyer.profile.helpSupportSub', 'Raise dispute tickets, order inquiries & live chat with support')}
                   </Text>
                 </View>
               </View>
@@ -3746,7 +3768,7 @@ export const BuyerProfileScreen: React.FC = () => {
               leftIcon={<LogOut size={16} color="#FFFFFF" />}
               onPress={logout}
             >
-              Sign Out of Account
+              {t('buyer.profile.logout', 'Sign Out of Account')}
             </Button>
           ) : (
             <Button
@@ -3756,7 +3778,7 @@ export const BuyerProfileScreen: React.FC = () => {
               leftIcon={<LogIn size={16} color="#FFFFFF" />}
               onPress={() => openAuth('buyer')}
             >
-              Sign In / Register Buyer Account
+              {t('header.signIn', 'Sign In / Register Buyer Account')}
             </Button>
           )}
 
@@ -3772,6 +3794,7 @@ export const BuyerProfileScreen: React.FC = () => {
 // ===================== 11. BUYER HELP & SUPPORT SCREEN =====================
 export const BuyerSupportScreen: React.FC = () => {
   const { currentUser, tickets, orders, raiseTicket, goToSubScreen, goBack, openAuth } = useApp();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'all' | 'open' | 'resolved'>('all');
   const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
 
@@ -3860,8 +3883,8 @@ export const BuyerSupportScreen: React.FC = () => {
               <ArrowLeft size={18} color="#1A1A1A" />
             </Pressable>
             <View>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A' }}>Help & Support</Text>
-              <Text style={{ fontSize: 11, color: '#6B7280' }}>Dispute tickets & support inquiries</Text>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A' }}>{t('buyer.support.title', 'Help & Support')}</Text>
+              <Text style={{ fontSize: 11, color: '#6B7280' }}>{t('buyer.support.subtitle', 'Dispute tickets & support inquiries')}</Text>
             </View>
           </View>
 
@@ -3871,7 +3894,7 @@ export const BuyerSupportScreen: React.FC = () => {
             leftIcon={<Plus size={14} color="#FFFFFF" />}
             onPress={handleOpenRaiseModal}
           >
-            Raise Ticket
+            {t('buyer.support.raiseTicket', 'Raise Ticket')}
           </Button>
         </View>
 
@@ -3889,7 +3912,7 @@ export const BuyerSupportScreen: React.FC = () => {
             }}
           >
             <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'all' ? '#FFFFFF' : '#4B5563' }}>
-              All ({buyerTickets.length})
+              {t('buyer.orders.tabAll', 'All')} ({buyerTickets.length})
             </Text>
           </Pressable>
 
@@ -3905,7 +3928,7 @@ export const BuyerSupportScreen: React.FC = () => {
             }}
           >
             <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'open' ? '#FFFFFF' : '#4B5563' }}>
-              Active ({openTicketsCount})
+              {t('buyer.orders.tabActive', 'Active')} ({openTicketsCount})
             </Text>
           </Pressable>
 
@@ -3921,7 +3944,7 @@ export const BuyerSupportScreen: React.FC = () => {
             }}
           >
             <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'resolved' ? '#FFFFFF' : '#4B5563' }}>
-              Resolved ({resolvedTicketsCount})
+              {t('buyer.support.statusResolved', 'Resolved')} ({resolvedTicketsCount})
             </Text>
           </Pressable>
         </View>

@@ -309,20 +309,49 @@ export const FarmerHomeScreen: React.FC = () => {
             </Pressable>
           </View>
 
-          {myListings.map(listing => (
-            <Card key={listing._id} padding="sm" className="flex-row items-center gap-3">
-              <ProduceVisual type={listing.cropName} size="sm" />
-              <View className="flex-1">
-                <Text className="text-xs font-bold text-[#1A1A1A]">{listing.cropName}</Text>
-                <Text className="text-[10px] text-[#6B7280]">
-                  Stock: {listing.quantityKg} kg · Min: {listing.minOrderKg} kg
-                </Text>
-                <Text className="text-xs font-black text-[#1F5C3A]">
-                  LKR {listing.pricePerKg}/kg
-                </Text>
-              </View>
-            </Card>
-          ))}
+          {myListings.map(listing => {
+            const photoUri =
+              (Array.isArray(listing.photos) && listing.photos.find((p: string) => isValidPhotoUrl(p))) ||
+              (isValidPhotoUrl(listing.image) ? listing.image : null) ||
+              (isValidPhotoUrl(listing.imageUrl) ? listing.imageUrl : null) ||
+              (isValidPhotoUrl((listing as any).photoUrl) ? (listing as any).photoUrl : null) ||
+              null;
+
+            return (
+              <Card key={listing._id} padding="sm" className="flex-row items-center gap-3">
+                {photoUri ? (
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: '#E5E7EB',
+                      overflow: 'hidden',
+                      backgroundColor: '#F3F4F6',
+                    }}
+                  >
+                    <Image
+                      source={{ uri: photoUri }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ) : (
+                  <ProduceVisual type={listing.cropName} size="sm" />
+                )}
+                <View className="flex-1">
+                  <Text className="text-xs font-bold text-[#1A1A1A]">{listing.cropName}</Text>
+                  <Text className="text-[10px] text-[#6B7280]">
+                    Stock: {listing.quantityKg} kg · Min: {listing.minOrderKg} kg
+                  </Text>
+                  <Text className="text-xs font-black text-[#1F5C3A]">
+                    LKR {listing.pricePerKg}/kg
+                  </Text>
+                </View>
+              </Card>
+            );
+          })}
         </View>
       </View>
     </ScrollView>

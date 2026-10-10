@@ -727,6 +727,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const priceVal = Number(data.pricePerKg ?? data.price ?? 0);
           const qtyVal = Number(data.quantityKg ?? data.quantity ?? 0);
           const minOrderVal = Number(data.minOrderKg ?? 1);
+
+          const rawPhotos: string[] = [];
+          if (Array.isArray(data.photos)) {
+            data.photos.forEach((p: any) => {
+              if (typeof p === 'string' && p.trim()) rawPhotos.push(p.trim());
+            });
+          } else if (typeof data.photos === 'string' && data.photos.trim()) {
+            rawPhotos.push(data.photos.trim());
+          }
+          if (typeof data.image === 'string' && data.image.trim() && !rawPhotos.includes(data.image.trim())) {
+            rawPhotos.push(data.image.trim());
+          }
+          if (typeof data.imageUrl === 'string' && data.imageUrl.trim() && !rawPhotos.includes(data.imageUrl.trim())) {
+            rawPhotos.push(data.imageUrl.trim());
+          }
+          if (typeof data.photoUrl === 'string' && data.photoUrl.trim() && !rawPhotos.includes(data.photoUrl.trim())) {
+            rawPhotos.push(data.photoUrl.trim());
+          }
+
+          const primaryImage = rawPhotos[0] || (typeof data.image === 'string' ? data.image.trim() : undefined) || (typeof data.imageUrl === 'string' ? data.imageUrl.trim() : undefined);
+
           return {
             _id: docSnap.id,
             farmerId: data.farmerId || '',
@@ -747,7 +768,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             offerBadge: data.offerBadge,
             offerTitle: data.offerTitle,
             harvestDate: data.harvestDate || new Date().toISOString().split('T')[0],
-            photos: Array.isArray(data.photos) && data.photos.length > 0 ? data.photos : [],
+            photos: rawPhotos,
+            image: primaryImage,
+            imageUrl: primaryImage,
+            photoUrl: primaryImage,
             description: data.description || '',
             status: (data.status as ListingStatus) || 'active',
             location: data.location || {

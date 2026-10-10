@@ -5,6 +5,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './src/services/store';
 import { AppHeader } from './src/components/shared/AppHeader';
 import { BottomNav } from './src/components/ui/BottomNav';
+import { LanguageProvider } from './src/i18n';
 import { AuthScreen } from './src/screens/auth/AuthScreens';
 import { BuyerScreens } from './src/screens/buyer/BuyerScreens';
 import { FarmerScreens } from './src/screens/farmer/FarmerScreens';
@@ -80,7 +81,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <MainNavigator />
+        <LanguageProvider>
+          <MainNavigator />
+        </LanguageProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

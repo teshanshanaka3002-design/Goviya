@@ -6,6 +6,7 @@ import { ProduceVisual } from '../ui/ProduceVisual';
 import { useApp } from '../../services/store';
 import { SellerProfileModal } from './SellerProfileModal';
 import { isValidPhotoUrl } from '../../services/imageService';
+import { useLanguage } from '../../i18n';
 
 export interface ProductCardProps {
   listing: Listing;
@@ -19,6 +20,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   compact = false,
 }) => {
   const { currentUser, openAuth, addToCart, goToSubScreen } = useApp();
+  const { t } = useLanguage();
   const [justAdded, setJustAdded] = React.useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = React.useState(false);
 
@@ -68,7 +70,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </View>
             ) : listing.offerBadge ? (
               <View style={ps.compactOfferBadge}>
-                <Text style={ps.compactOfferText}>Deal</Text>
+                <Text style={ps.compactOfferText}>{listing.offerBadge || t('common.deal', 'Deal')}</Text>
               </View>
             ) : null}
           </Pressable>
@@ -84,17 +86,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </Pressable>
             <View style={ps.compactPriceRow}>
               <Text style={ps.priceTextSmall}>
-                {`LKR ${listing.pricePerKg.toLocaleString()}`}
+                {`${t('common.lkr', 'LKR')} ${listing.pricePerKg.toLocaleString()}`}
               </Text>
-              <Text style={ps.unitText}>/kg</Text>
+              <Text style={ps.unitText}>/{t('common.kg', 'kg')}</Text>
               {listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg ? (
                 <Text style={ps.compactOriginalPrice}>
-                  {`LKR ${listing.originalPricePerKg}`}
+                  {`${t('common.lkr', 'LKR')} ${listing.originalPricePerKg}`}
                 </Text>
               ) : (
                 <>
                   <Text style={ps.minOrderDot}>·</Text>
-                  <Text style={ps.minOrderText}>From 1kg</Text>
+                  <Text style={ps.minOrderText}>{t('buyer.product.from1kg', 'From 1kg')}</Text>
                 </>
               )}
             </View>
@@ -165,7 +167,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 </View>
               ) : listing.isOrganic ? (
                 <View style={ps.organicBadge}>
-                  <Text style={ps.organicBadgeText}>Organic</Text>
+                  <Text style={ps.organicBadgeText}>{t('common.organic', 'Organic')}</Text>
                 </View>
               ) : null}
 
@@ -205,7 +207,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               </Text>
               <View style={ps.chatPill}>
                 <MessageSquare size={10} color="#1F5C3A" />
-                <Text style={ps.chatPillText}>Chat</Text>
+                <Text style={ps.chatPillText}>{t('common.chat', 'Chat')}</Text>
               </View>
             </Pressable>
           </View>
@@ -216,22 +218,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <View style={ps.priceInfo}>
             <View style={ps.priceAmountRow}>
               <Text style={ps.priceValue} numberOfLines={1}>
-                {`LKR ${listing.pricePerKg.toLocaleString()}`}
+                {`${t('common.lkr', 'LKR')} ${listing.pricePerKg.toLocaleString()}`}
               </Text>
-              <Text style={ps.priceUnit}>/kg</Text>
+              <Text style={ps.priceUnit}>/{t('common.kg', 'kg')}</Text>
             </View>
             {listing.originalPricePerKg && listing.originalPricePerKg > listing.pricePerKg ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
                 <Text style={ps.strikethroughPrice} numberOfLines={1}>
-                  {`LKR ${listing.originalPricePerKg}`}
+                  {`${t('common.lkr', 'LKR')} ${listing.originalPricePerKg}`}
                 </Text>
                 <Text style={ps.savingsText} numberOfLines={1}>
-                  {`Save LKR ${listing.originalPricePerKg - listing.pricePerKg}`}
+                  {`${t('buyer.product.saveLkr', 'Save LKR')} ${listing.originalPricePerKg - listing.pricePerKg}`}
                 </Text>
               </View>
             ) : (
               <Text style={ps.minOrderSubtitle}>
-                From 1 kg
+                {t('buyer.product.from1kg', 'From 1 kg')}
               </Text>
             )}
           </View>
@@ -249,12 +251,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {justAdded ? (
               <View style={ps.btnContent}>
                 <Check size={13} color="#FFFFFF" strokeWidth={2.5} />
-                <Text style={ps.addedBtnText}>Added</Text>
+                <Text style={ps.addedBtnText}>{t('common.added', 'Added')}</Text>
               </View>
             ) : (
               <View style={ps.btnContent}>
                 <Plus size={13} color="#1F5C3A" strokeWidth={2.5} />
-                <Text style={ps.addBtnText}>Add</Text>
+                <Text style={ps.addBtnText}>{t('common.add', 'Add')}</Text>
               </View>
             )}
           </Pressable>

@@ -12,6 +12,8 @@ import {
 import { useApp } from '../../services/store';
 import { Role } from '../../types';
 import { GoviyaLogo } from './GoviyaLogo';
+import { LanguageSwitcher } from './LanguageSwitcher';
+import { useLanguage } from '../../i18n';
 
 export interface AppHeaderProps {
   title?: string;
@@ -37,19 +39,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     cart,
     setTab,
   } = useApp();
+  const { t } = useLanguage();
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
 
   const roleTitles: Record<Role, string> = {
-    buyer: currentUser ? 'Buyer Portal' : 'Marketplace (Guest)',
-    farmer: 'Farmer Studio',
-    driver: 'Logistics Fleet',
-    admin: 'Platform Admin',
+    buyer: currentUser ? t('header.buyerPortal', 'Buyer Portal') : t('header.guestBuyer', 'Marketplace (Guest)'),
+    farmer: t('header.farmerStudio', 'Farmer Studio'),
+    driver: t('header.logisticsFleet', 'Logistics Fleet'),
+    admin: t('header.platformAdmin', 'Platform Admin'),
   };
 
   const roleBadges: Record<Role, { label: string; bg: string; text: string }> = {
     buyer: {
-      label: currentUser ? 'Buyer' : 'Guest Buyer',
+      label: currentUser ? t('nav.profile', 'Buyer') : t('header.guestBuyer', 'Guest Buyer'),
       bg: 'bg-[#E6F2E8]',
       text: 'text-[#1F5C3A]',
     },
@@ -59,16 +62,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   const subScreenTitles: Record<string, string> = {
-    product_detail: 'Crop Details',
-    cart: 'Shopping Cart',
-    checkout: 'Checkout & Delivery',
-    order_confirmation: 'Order Confirmed',
-    order_tracking: 'Live Delivery Tracking',
-    my_orders: 'My Orders',
-    chat_list: 'Messages',
-    chat_detail: 'Direct Chat',
-    market_prices: 'Official Mandi Rates',
-    nearby_map: 'Nearby Producers Map',
+    product_detail: t('subscreen.cropDetails', 'Crop Details'),
+    cart: t('subscreen.cart', 'Shopping Cart'),
+    checkout: t('subscreen.checkout', 'Checkout & Delivery'),
+    order_confirmation: t('subscreen.orderConfirmation', 'Order Confirmed'),
+    order_tracking: t('subscreen.orderTracking', 'Live Delivery Tracking'),
+    my_orders: t('subscreen.myOrders', 'My Orders'),
+    chat_list: t('nav.messages', 'Messages'),
+    chat_detail: t('subscreen.chat', 'Direct Chat'),
+    market_prices: t('subscreen.marketPrices', 'Official Mandi Rates'),
+    nearby_map: t('subscreen.nearbyMap', 'Nearby Producers Map'),
+    help_support: t('subscreen.helpSupport', 'Help & Support'),
+    buyer_ticket_detail: t('subscreen.ticketChat', 'Ticket Support Chat'),
     add_listing: 'Post New Harvest',
     driver_order_detail: 'Delivery Order Details',
     edit_driver_profile: 'Driver Profile',
@@ -142,19 +147,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 </Pressable>
               )}
 
-              {/* Role Switcher Pill */}
-              <Pressable
-                onPress={() => setShowRoleMenu(true)}
-                style={({ pressed }) => [
-                  pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
-                ]}
-                className={`flex-row items-center gap-1 px-2.5 py-1 rounded-full border border-black/5 ${currentBadge.bg}`}
-              >
-                <Shuffle size={11} color={currentRole === 'farmer' ? '#B45309' : currentRole === 'driver' ? '#19768A' : currentRole === 'admin' ? '#7C3AED' : '#1F5C3A'} />
-                <Text className={`text-xs font-semibold ${currentBadge.text}`}>
-                  {currentBadge.label}
-                </Text>
-              </Pressable>
+              {/* For Buyer: Language Switcher (EN | සිං | தமிழ்) */}
+              {currentRole === 'buyer' ? (
+                <LanguageSwitcher />
+              ) : (
+                /* Role Switcher Pill for other roles */
+                <Pressable
+                  onPress={() => setShowRoleMenu(true)}
+                  style={({ pressed }) => [
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.97 }] },
+                  ]}
+                  className={`flex-row items-center gap-1 px-2.5 py-1 rounded-full border border-black/5 ${currentBadge.bg}`}
+                >
+                  <Shuffle size={11} color={currentRole === 'farmer' ? '#B45309' : currentRole === 'driver' ? '#19768A' : currentRole === 'admin' ? '#7C3AED' : '#1F5C3A'} />
+                  <Text className={`text-xs font-semibold ${currentBadge.text}`}>
+                    {currentBadge.label}
+                  </Text>
+                </Pressable>
+              )}
 
               {/* Admin Quick Sign Out Button */}
               {currentRole === 'admin' && (

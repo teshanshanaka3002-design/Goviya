@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { OrderStatus } from '../../types';
+import { useLanguage } from '../../i18n';
 
 export interface StatusPillProps {
   status:
@@ -26,6 +27,7 @@ export interface StatusPillProps {
 }
 
 export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className = '' }) => {
+  const { t } = useLanguage();
   const norm = status.toLowerCase();
 
   let bgColor = '#FEF8EA';
@@ -39,7 +41,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
     textColor = '#B45309';
     borderColor = '#FCE7C2';
     dotColor = '#E8A317';
-    displayLabel = label || (norm === 'open' ? 'Open' : 'Pending');
+    displayLabel = label || (norm === 'open' ? t('buyer.support.statusOpen', 'Open') : t('order.status.pending', 'Pending'));
   } else if (
     norm === 'confirmed' ||
     norm === 'accepted' ||
@@ -55,28 +57,28 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
     displayLabel =
       label ||
       (norm === 'out_for_delivery'
-        ? 'Out for Delivery'
+        ? t('order.status.out_for_delivery', 'Out for Delivery')
         : norm === 'ready_for_pickup'
-        ? 'Ready for Pickup'
+        ? t('order.status.ready_for_pickup', 'Ready for Pickup')
         : norm === 'preparing'
-        ? 'Preparing'
+        ? t('order.status.preparing', 'Preparing')
         : norm === 'accepted'
-        ? 'Accepted'
+        ? t('order.status.accepted', 'Accepted')
         : norm === 'in_progress'
-        ? 'In Progress'
-        : 'Confirmed');
+        ? t('buyer.support.statusInProgress', 'In Progress')
+        : t('order.status.accepted', 'Confirmed'));
   } else if (norm === 'delivered' || norm === 'completed' || norm === 'active' || norm === 'resolved') {
     bgColor = '#E6F2E8';
     textColor = '#1F5C3A';
     borderColor = '#C9E6D0';
     dotColor = '#1F5C3A';
-    displayLabel = label || (norm === 'active' ? 'Active' : norm === 'resolved' ? 'Resolved' : 'Delivered');
+    displayLabel = label || (norm === 'active' ? t('buyer.orders.tabActive', 'Active') : norm === 'resolved' ? t('buyer.support.statusResolved', 'Resolved') : t('order.status.delivered', 'Delivered'));
   } else if (norm === 'rejected' || norm === 'cancelled' || norm === 'out_of_stock' || norm === 'dismissed' || norm === 'closed') {
     bgColor = norm === 'closed' ? '#F3F4F6' : '#FDEEEB';
     textColor = norm === 'closed' ? '#4B5563' : '#C8452D';
     borderColor = norm === 'closed' ? '#E5E7EB' : '#F8C8BF';
     dotColor = norm === 'closed' ? '#6B7280' : '#C8452D';
-    displayLabel = label || (norm === 'closed' ? 'Closed' : norm === 'out_of_stock' ? 'Out of Stock' : norm === 'cancelled' ? 'Cancelled' : norm === 'dismissed' ? 'Dismissed' : 'Rejected');
+    displayLabel = label || (norm === 'closed' ? t('buyer.support.statusClosed', 'Closed') : norm === 'out_of_stock' ? 'Out of Stock' : norm === 'cancelled' ? t('order.status.cancelled', 'Cancelled') : norm === 'dismissed' ? 'Dismissed' : t('order.status.rejected', 'Rejected'));
   }
 
   return (

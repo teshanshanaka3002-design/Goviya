@@ -75,6 +75,9 @@ export interface Listing {
   offerTitle?: string; // e.g. "Hill Country Harvest Deal"
   harvestDate: string;
   photos: string[];
+  image?: string;
+  imageUrl?: string;
+  photoUrl?: string;
   description: string;
   status: ListingStatus;
   location: {
