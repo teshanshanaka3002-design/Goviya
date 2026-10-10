@@ -31,7 +31,7 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
   onClose,
   initialCropName,
 }) => {
-  const { users, listings, addToCart, cart, getOrCreateConversation, goToSubScreen } = useApp();
+  const { currentUser, openAuth, users, listings, addToCart, cart, getOrCreateConversation, goToSubScreen } = useApp();
   const [addedListingIds, setAddedListingIds] = React.useState<Record<string, boolean>>({});
 
   if (!isOpen || !farmerId) return null;
@@ -52,6 +52,10 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
 
   const handleChatWithSeller = () => {
     onClose();
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     const primaryCrop = initialCropName || farmerListings[0]?.cropName || 'Fresh Harvest';
     const convId = getOrCreateConversation(farmerId, farmerName, primaryCrop, 'farmer');
     goToSubScreen('chat_detail', { conversationId: convId });
@@ -62,6 +66,11 @@ export const SellerProfileModal: React.FC<SellerProfileModalProps> = ({
   };
 
   const handleAddToCart = (listing: Listing) => {
+    if (!currentUser) {
+      onClose();
+      openAuth('buyer', 'login');
+      return;
+    }
     addToCart(listing, listing.minOrderKg || 5);
     setAddedListingIds(prev => ({ ...prev, [listing._id]: true }));
     setTimeout(() => {

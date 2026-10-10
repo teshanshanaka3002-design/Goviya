@@ -74,13 +74,17 @@ import { isValidPhotoUrl } from '../../services/imageService';
 
 // ===================== OFFER CARD COMPONENT =====================
 const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
-  const { addToCart, goToSubScreen } = useApp();
+  const { currentUser, openAuth, addToCart, goToSubScreen } = useApp();
   const [justAdded, setJustAdded] = useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = useState(false);
   const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
 
   const handleAdd = (e?: any) => {
     e?.stopPropagation?.();
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     addToCart(listing, 1);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
@@ -201,13 +205,17 @@ const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
 
 // ===================== DISCOUNTED CARD COMPONENT =====================
 const DiscountCard: React.FC<{ listing: Listing }> = ({ listing }) => {
-  const { addToCart, goToSubScreen } = useApp();
+  const { currentUser, openAuth, addToCart, goToSubScreen } = useApp();
   const [justAdded, setJustAdded] = useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = useState(false);
   const hasPhoto = isValidPhotoUrl(listing.photos?.[0]);
 
   const handleAdd = (e?: any) => {
     e?.stopPropagation?.();
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     addToCart(listing, 1);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
@@ -849,7 +857,7 @@ export const BuyerHomeScreen: React.FC = () => {
 
 // ===================== 2. BUYER PRODUCT DETAIL SCREEN =====================
 export const BuyerProductDetailScreen: React.FC = () => {
-  const { navState, listings, addToCart, goBack, getOrCreateConversation, goToSubScreen } = useApp();
+  const { currentUser, openAuth, navState, listings, addToCart, goBack, getOrCreateConversation, goToSubScreen } = useApp();
   const insets = useSafeAreaInsets();
   const [quantity, setQuantity] = useState<number>(1);
   const [justAdded, setJustAdded] = useState(false);
@@ -862,17 +870,29 @@ export const BuyerProductDetailScreen: React.FC = () => {
   const totalPrice = currentQty * listing.pricePerKg;
 
   const handleAddToCart = () => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     addToCart(listing, currentQty);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 2000);
   };
 
   const handleBuyNow = () => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     addToCart(listing, currentQty);
     goToSubScreen('checkout');
   };
 
   const handleChat = () => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     const convId = getOrCreateConversation(listing.farmerId, listing.farmerName, listing.cropName, 'farmer');
     goToSubScreen('chat_detail', { conversationId: convId });
   };
@@ -1165,7 +1185,7 @@ export const BuyerProductDetailScreen: React.FC = () => {
 
 // ===================== 3. BUYER NEARBY SCREEN =====================
 export const BuyerNearbyScreen: React.FC = () => {
-  const { users, listings, getOrCreateConversation, goToSubScreen } = useApp();
+  const { currentUser, openAuth, users, listings, getOrCreateConversation, goToSubScreen } = useApp();
   const [searchLocation, setSearchLocation] = useState<string>('');
   const [filterType, setFilterType] = useState<'all' | 'farmers' | 'vegetables'>('all');
   const [selectedFarmerModalId, setSelectedFarmerModalId] = useState<string | null>(null);
@@ -1287,6 +1307,10 @@ export const BuyerNearbyScreen: React.FC = () => {
   }, [filteredFarmers, filteredVegetables, filterType]);
 
   const handleChat = (farmerId: string, farmerName: string) => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     const primaryCrop = listings.find(l => l.farmerId === farmerId)?.cropName || 'Fresh Harvest';
     const convId = getOrCreateConversation(farmerId, farmerName, primaryCrop, 'farmer');
     goToSubScreen('chat_detail', { conversationId: convId });
@@ -1773,7 +1797,7 @@ export const BuyerNearbyScreen: React.FC = () => {
 
 // ===================== 4. BUYER CART SCREEN =====================
 export const BuyerCartScreen: React.FC = () => {
-  const { cart, updateCartQuantity, removeFromCart, clearCart, goToSubScreen } = useApp();
+  const { currentUser, openAuth, cart, updateCartQuantity, removeFromCart, clearCart, goToSubScreen } = useApp();
   const subtotal = cart.reduce((acc, item) => acc + item.listing.pricePerKg * item.quantityKg, 0);
   const deliveryFee = cart.length > 0 ? 1500 : 0;
   const total = subtotal + deliveryFee;
@@ -1890,7 +1914,13 @@ export const BuyerCartScreen: React.FC = () => {
           fullWidth
           size="lg"
           rightIcon={<ArrowRight size={18} color="#FFFFFF" strokeWidth={2.5} />}
-          onPress={() => goToSubScreen('checkout')}
+          onPress={() => {
+            if (!currentUser) {
+              openAuth('buyer', 'login');
+              return;
+            }
+            goToSubScreen('checkout');
+          }}
         >
           {`Proceed to Checkout (LKR ${total.toLocaleString()})`}
         </Button>
@@ -1903,8 +1933,14 @@ export const BuyerCartScreen: React.FC = () => {
 type CheckoutStep = 'details' | 'cod_confirm' | 'card_form' | 'wallet_form';
 
 export const BuyerCheckoutScreen: React.FC = () => {
-  const { cart, currentUser, placeOrder, goToSubScreen, goBack } = useApp();
+  const { cart, currentUser, openAuth, placeOrder, goToSubScreen, goBack } = useApp();
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+    }
+  }, [currentUser]);
 
   const [step, setStep] = useState<CheckoutStep>('details');
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'pickup'>('delivery');
@@ -1971,6 +2007,10 @@ export const BuyerCheckoutScreen: React.FC = () => {
 
   // Step 2A: Confirm COD order
   const handlePlaceCodOrder = () => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     if (!codAgreed) {
       Alert.alert(
         'Confirmation Required',
@@ -1997,6 +2037,10 @@ export const BuyerCheckoutScreen: React.FC = () => {
 
   // Step 2B: Pay with Card
   const handlePlaceCardOrder = () => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     if (!cardHolder.trim()) {
       Alert.alert('Required', 'Please enter the cardholder name.');
       return;
@@ -2037,6 +2081,10 @@ export const BuyerCheckoutScreen: React.FC = () => {
 
   // Step 2C: Pay via Mobile Wallet
   const handlePlaceWalletOrder = () => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     if (!walletPhone.trim()) {
       Alert.alert('Required', 'Please enter your mobile wallet phone number.');
       return;

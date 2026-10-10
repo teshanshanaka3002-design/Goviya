@@ -108,10 +108,12 @@ export const FARMER_AVATAR_PRESETS = [
 export const FarmerHomeScreen: React.FC = () => {
   const { listings, orders, currentUser, users, farmerAcceptOrder, farmerRejectOrder, setTab, goToSubScreen } = useApp();
 
-  const currentFarmerId = currentUser?.role === 'farmer' ? currentUser._id : 'user_farmer_1';
-  const currentFarmer = users.find(u => u._id === currentFarmerId) || currentUser;
+  const currentFarmerId = currentUser?.role === 'farmer' ? (currentUser.uid || currentUser._id) : 'user_farmer_1';
+  const currentFarmer = users.find(u => u._id === currentFarmerId || (currentUser?.uid && u._id === currentUser.uid)) || currentUser;
 
-  const myListings = listings.filter(l => l.farmerId === currentFarmerId && l.status === 'active');
+  const myListings = listings.filter(
+    l => (l.farmerId === currentFarmerId || (currentUser?.uid && l.farmerId === currentUser.uid) || (currentUser?._id && l.farmerId === currentUser._id)) && l.status === 'active'
+  );
   const myOrders = orders.filter(
     o => o.farmerId === currentFarmerId || (currentFarmer && o.farmerName === currentFarmer.name)
   );
@@ -336,8 +338,12 @@ export const FarmerListingsScreen: React.FC = () => {
     updateListingStatus,
   } = useApp();
 
-  const currentFarmerId = currentUser?.role === 'farmer' ? currentUser._id : 'user_farmer_1';
-  const myListings = listings.filter(l => l.farmerId === currentFarmerId);
+  const currentFarmerId = currentUser?.role === 'farmer' ? (currentUser.uid || currentUser._id) : 'user_farmer_1';
+  const myListings = listings.filter(
+    l => l.farmerId === currentFarmerId ||
+         (currentUser?.uid && l.farmerId === currentUser.uid) ||
+         (currentUser?._id && l.farmerId === currentUser._id)
+  );
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'out_of_stock'>('all');
 
@@ -957,6 +963,7 @@ export const FarmerAddListingScreen: React.FC = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const cropPresets = ['Carrots', 'Tomatoes', 'Potatoes', 'Red Onions', 'Leeks', 'Cabbage', 'Green Chillies'];
   const categories: Array<'Vegetables' | 'Fruits' | 'Spices & Herbs' | 'Grains & Rice' | 'Tubers'> = [
@@ -989,7 +996,17 @@ export const FarmerAddListingScreen: React.FC = () => {
     setUploadedPhotos(prev => prev.filter((_, idx) => idx !== idxToRemove));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    if (!currentUser?.verified) {
+      setErrorMsg('Your farmer account is pending verification. Only verified farmers can publish listings.');
+      Alert.alert(
+        'Verification Required',
+        'Your farmer account is currently pending administrative verification. Only verified farmers can publish harvest listings.'
+      );
+      return;
+    }
     if (!cropName.trim()) {
       setErrorMsg('Please specify the crop name');
       return;
@@ -1011,27 +1028,38 @@ export const FarmerAddListingScreen: React.FC = () => {
       ? uploadedPhotos
       : [HARVEST_PHOTO_PRESETS[selectedPhotoIndex]?.url || ''];
 
-    addListing({
-      cropName: cropName.trim(),
-      category,
-      quantityKg: q,
-      minOrderKg: isNaN(m) || m <= 0 ? 5 : m,
-      pricePerKg: p,
-      harvestDate: new Date().toISOString().split('T')[0],
-      photos: finalPhotos,
-      description: description.trim(),
-      status: 'active',
-      location: {
-        lat: currentUser?.location?.lat || 6.9697,
-        lng: currentUser?.location?.lng || 80.7891,
-        district: currentUser?.location?.district || 'Nuwara Eliya',
-        town: currentUser?.location?.town || 'Kandapola',
-      },
-      isOrganic,
-    });
+    try {
+      setIsSubmitting(true);
+      setErrorMsg(null);
+      await addListing({
+        cropName: cropName.trim(),
+        category,
+        quantityKg: q,
+        minOrderKg: isNaN(m) || m <= 0 ? 5 : m,
+        pricePerKg: p,
+        harvestDate: new Date().toISOString().split('T')[0],
+        photos: finalPhotos,
+        description: description.trim(),
+        status: 'active',
+        location: {
+          lat: currentUser?.location?.lat || 6.9697,
+          lng: currentUser?.location?.lng || 80.7891,
+          district: currentUser?.district || currentUser?.location?.district || 'Nuwara Eliya',
+          town: currentUser?.location?.town || 'Kandapola',
+        },
+        isOrganic,
+      });
 
-    setTab('listings');
-    goToSubScreen(null);
+      Alert.alert('Success', 'Listing created successfully on Firestore!');
+      setTab('listings');
+      goToSubScreen(null);
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to create listing in Firestore';
+      setErrorMsg(msg);
+      Alert.alert('Publish Error', msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -1365,8 +1393,9 @@ export const FarmerAddListingScreen: React.FC = () => {
             style={{ flex: 2 }}
             leftIcon={<Plus size={18} color="#ffffff" />}
             onPress={handleSubmit}
+            disabled={isSubmitting}
           >
-            Publish Harvest
+            {isSubmitting ? 'Publishing to Firestore...' : 'Publish Harvest'}
           </Button>
         </View>
       </View>

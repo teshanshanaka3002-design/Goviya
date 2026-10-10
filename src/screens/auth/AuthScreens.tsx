@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Sprout,
@@ -15,6 +16,7 @@ import {
   Truck,
   User as UserIcon,
   Phone,
+  Mail,
   Lock,
   Eye,
   EyeOff,
@@ -40,9 +42,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   initialView = 'login',
 }) => {
   const {
+    login,
     loginAsUser,
     loginAsRole,
     registerUser,
+    authLoading,
+    authError,
     authTargetRole,
     users,
   } = useApp();
@@ -50,7 +55,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const [view, setView] = useState<'login' | 'register'>(initialView);
 
   // Form states
-  const [identifier, setIdentifier] = useState(''); // phone or email
+  const [identifier, setIdentifier] = useState(''); // phone or email (used in Login)
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -63,6 +68,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
   // Common register fields
   const [fullName, setFullName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   // Delivery Rider specific fields
@@ -101,48 +108,49 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   // Handle standard Login submission
-  const handleLoginSubmit = () => {
+  const handleLoginSubmit = async () => {
     const rawInput = identifier.trim();
-    const cleanId = rawInput.toLowerCase();
-    const inputDigits = normalizeDigits(rawInput);
+    if (!rawInput) {
+      Alert.alert('Email or Phone Required', 'Please enter your phone number or email address.');
+      return;
+    }
 
-    // 1. Try matching existing registered user by phone digits, email, or name
-    if (rawInput) {
-      const matched = users.find(u => {
-        const uDigits = normalizeDigits(u.phone);
-        const phoneMatch = inputDigits.length >= 7 && uDigits.includes(inputDigits);
-        const emailMatch = u.email && u.email.toLowerCase() === cleanId;
-        const nameMatch = u.name.toLowerCase() === cleanId;
-        return phoneMatch || emailMatch || nameMatch;
-      });
-
-      if (matched) {
-        loginAsUser(matched._id);
+    if (!password.trim()) {
+      // If password was omitted, check if user tapped demo keyword shortcuts
+      const cleanId = rawInput.toLowerCase();
+      if (cleanId.includes('admin')) {
+        loginAsRole('admin');
         return;
       }
-    }
-
-    // 2. Keyword check if user typed role hint
-    if (cleanId.includes('admin')) {
-      loginAsRole('admin');
-      return;
-    }
-    if (cleanId.includes('driver') || cleanId.includes('logi') || cleanId.includes('rider')) {
-      loginAsRole('driver');
-      return;
-    }
-    if (cleanId.includes('farmer')) {
-      loginAsRole('farmer');
-      return;
-    }
-    if (cleanId.includes('buyer')) {
-      loginAsRole('buyer');
+      if (cleanId.includes('driver') || cleanId.includes('logi') || cleanId.includes('rider')) {
+        loginAsRole('driver');
+        return;
+      }
+      if (cleanId.includes('farmer')) {
+        loginAsRole('farmer');
+        return;
+      }
+      if (cleanId.includes('buyer')) {
+        loginAsRole('buyer');
+        return;
+      }
+      Alert.alert('Password Required', 'Please enter your account password.');
       return;
     }
 
-    // 3. Fallback based on context
-    const targetRole: Role = initialRole || authTargetRole || 'buyer';
-    loginAsRole(targetRole);
+    if (password.trim().length < 6) {
+      Alert.alert('Invalid Password', 'Password must be at least 6 characters long.');
+      return;
+    }
+
+    try {
+      await login(rawInput, password);
+    } catch (err: any) {
+      Alert.alert(
+        'Login Failed',
+        err.message || 'Incorrect email/phone or password. Please verify your credentials and try again.'
+      );
+    }
   };
 
   // Handle OTP Login
@@ -206,17 +214,52 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   };
 
   // Handle Create Account / Register submission
-  const handleRegisterSubmit = () => {
+  const handleRegisterSubmit = async () => {
     if (!fullName.trim()) {
       Alert.alert('Full Name Required', 'Please enter your full name to create an account.');
       return;
     }
 
-    if (!identifier.trim()) {
-      Alert.alert(
-        'Contact Info Required',
-        'Please enter your phone number or email address.'
-      );
+    const cleanEmail = registerEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      Alert.alert('Email Required', 'Please enter your email address to create an account.');
+      return;
+    }
+
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address (e.g. name@example.com).');
+      return;
+    }
+
+    const rawPhone = registerPhone.trim();
+    if (!rawPhone) {
+      Alert.alert('Phone Number Required', 'Please enter your contact mobile number.');
+      return;
+    }
+
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 9) {
+      Alert.alert('Invalid Phone Number', 'Please enter a valid phone number with at least 9 digits.');
+      return;
+    }
+
+    // Clean phone number format for Sri Lanka
+    let formattedPhone = rawPhone;
+    if (phoneDigits.startsWith('94') && phoneDigits.length >= 11) {
+      formattedPhone = `+${phoneDigits.slice(0, 2)} ${phoneDigits.slice(2, 4)} ${phoneDigits.slice(4, 7)} ${phoneDigits.slice(7)}`;
+    } else if (phoneDigits.startsWith('0') && phoneDigits.length >= 10) {
+      formattedPhone = `+94 ${phoneDigits.slice(1, 3)} ${phoneDigits.slice(3, 6)} ${phoneDigits.slice(6)}`;
+    } else if (phoneDigits.length === 9) {
+      formattedPhone = `+94 ${phoneDigits.slice(0, 2)} ${phoneDigits.slice(2, 5)} ${phoneDigits.slice(5)}`;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Password Required', 'Please enter a password with at least 6 characters.');
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      Alert.alert('Weak Password', 'Your password must be at least 6 characters long.');
       return;
     }
 
@@ -263,84 +306,91 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       return;
     }
 
-    // Format phone cleanly
-    const rawContact = identifier.trim();
-    let formattedPhone = rawContact;
-    if (!rawContact.includes('@')) {
-      const digits = rawContact.replace(/\D/g, '');
-      if (digits.startsWith('94')) {
-        formattedPhone = `+${digits.slice(0, 2)} ${digits.slice(2, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
-      } else if (digits.startsWith('0')) {
-        formattedPhone = `+94 ${digits.slice(1, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`;
-      } else {
-        formattedPhone = `+94 ${digits}`;
+    try {
+      // 1. DELIVERY RIDER REGISTRATION
+      if (registerRole === 'driver') {
+        await registerUser(
+          {
+            name: fullName.trim(),
+            email: cleanEmail,
+            phone: formattedPhone,
+            role: 'driver',
+            verified: false,
+            drivingLicenceNumber: drivingLicense.trim(),
+            drivingLicense: drivingLicense.trim(),
+            vehicleType,
+            vehiclePlate: vehiclePlate.trim().toUpperCase(),
+            district: riderDistrict,
+            rating: 5.0,
+            totalRatings: 1,
+            location: {
+              lat: riderDistrict === 'Colombo' ? 6.9271 : 7.084,
+              lng: riderDistrict === 'Colombo' ? 79.8612 : 80.0098,
+              district: riderDistrict,
+              address: `${riderDistrict} Delivery Hub & Logistics Depot`,
+            },
+          },
+          password
+        );
+        return;
       }
-    }
 
-    // 1. DELIVERY RIDER REGISTRATION
-    if (registerRole === 'driver') {
-      registerUser({
-        name: fullName.trim(),
-        phone: formattedPhone,
-        email: rawContact.includes('@') ? rawContact : undefined,
-        role: 'driver',
-        verified: true,
-        vehicleType,
-        vehiclePlate: vehiclePlate.trim().toUpperCase(),
-        rating: 5.0,
-        totalRatings: 1,
-        location: {
-          lat: riderDistrict === 'Colombo' ? 6.9271 : 7.084,
-          lng: riderDistrict === 'Colombo' ? 79.8612 : 80.0098,
-          district: riderDistrict,
-          address: `${riderDistrict} Delivery Hub & Logistics Depot`,
+      // 2. FARMER REGISTRATION
+      if (registerRole === 'farmer') {
+        await registerUser(
+          {
+            name: fullName.trim(),
+            email: cleanEmail,
+            phone: formattedPhone,
+            role: 'farmer',
+            verified: false, // Farmers start unverified and require admin KYC approval
+            nicNumber: nicNumber.trim(),
+            farmName: farmName.trim(),
+            district: farmerDistrict,
+            farmSizeAcres: parseFloat(farmSize) || 3.0,
+            yearsFarming: 5,
+            rating: 5.0,
+            totalRatings: 1,
+            location: {
+              lat: 6.9697,
+              lng: 80.7891,
+              district: farmerDistrict,
+              town: farmerDistrict === 'Nuwara Eliya' ? 'Kandapola' : farmerDistrict,
+              address: `${farmName.trim()}, ${farmerDistrict}, Sri Lanka`,
+            },
+          },
+          password
+        );
+        return;
+      }
+
+      // 3. BUYER REGISTRATION (Name, Phone, Email, Password)
+      await registerUser(
+        {
+          name: fullName.trim(),
+          email: cleanEmail,
+          phone: formattedPhone,
+          role: 'buyer',
+          verified: true, // Buyers can use their account immediately
+          district: 'Colombo',
+          rating: 5.0,
+          totalRatings: 1,
+          location: {
+            lat: 6.9271,
+            lng: 79.8612,
+            district: 'Colombo',
+            town: 'Colombo 03',
+            address: 'Colombo, Western Province',
+          },
         },
-      });
-      return;
+        password
+      );
+    } catch (err: any) {
+      Alert.alert(
+        'Registration Failed',
+        err.message || 'Unable to create your account at this time. Please check your connection and try again.'
+      );
     }
-
-    // 2. FARMER REGISTRATION
-    if (registerRole === 'farmer') {
-      registerUser({
-        name: fullName.trim(),
-        phone: formattedPhone,
-        email: rawContact.includes('@') ? rawContact : undefined,
-        role: 'farmer',
-        verified: false, // Farmers submit documents and require admin KYC approval
-        nicNumber: nicNumber.trim(),
-        farmName: farmName.trim(),
-        farmSizeAcres: parseFloat(farmSize) || 3.0,
-        yearsFarming: 5,
-        rating: 5.0,
-        totalRatings: 1,
-        location: {
-          lat: 6.9697,
-          lng: 80.7891,
-          district: farmerDistrict,
-          town: farmerDistrict === 'Nuwara Eliya' ? 'Kandapola' : farmerDistrict,
-          address: `${farmName.trim()}, ${farmerDistrict}, Sri Lanka`,
-        },
-      });
-      return;
-    }
-
-    // 3. BUYER REGISTRATION (Name, Phone/Email, Password)
-    registerUser({
-      name: fullName.trim(),
-      phone: formattedPhone,
-      email: rawContact.includes('@') ? rawContact : undefined,
-      role: 'buyer',
-      verified: true,
-      rating: 5.0,
-      totalRatings: 1,
-      location: {
-        lat: 6.9271,
-        lng: 79.8612,
-        district: 'Colombo',
-        town: 'Colombo 03',
-        address: 'Colombo, Western Province',
-      },
-    });
   };
 
   const vehicleOptions: ('Three-Wheeler' | 'Light Truck (Dimas)' | 'Motorbike' | 'Lorry')[] = [
@@ -584,6 +634,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {/* Primary Log In Button */}
               <Pressable
                 onPress={handleLoginSubmit}
+                disabled={authLoading}
                 style={({ pressed }) => [
                   {
                     height: 50,
@@ -593,18 +644,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     justifyContent: 'center',
                     marginTop: 6,
                   },
+                  authLoading && { opacity: 0.75 },
                   pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: '700',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  Log In
-                </Text>
+                {authLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: '700',
+                      color: '#FFFFFF',
+                    }}
+                  >
+                    Log In
+                  </Text>
+                )}
               </Pressable>
 
               {/* Secondary Log in with OTP Button */}
@@ -802,7 +858,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 </View>
               </View>
 
-              {/* Field: Phone Number / Email */}
+              {/* Field: Email Address */}
               <View>
                 <Text
                   style={{
@@ -812,7 +868,51 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     marginBottom: 7,
                   }}
                 >
-                  Phone Number / Email
+                  Email Address
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    height: 50,
+                    backgroundColor: '#FFFFFF',
+                    gap: 10,
+                  }}
+                >
+                  <Mail size={18} color="#9CA3AF" />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13.5,
+                      color: '#1A1A1A',
+                      padding: 0,
+                    }}
+                    placeholder="Enter your email address"
+                    placeholderTextColor="#9CA3AF"
+                    value={registerEmail}
+                    onChangeText={setRegisterEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
+
+              {/* Field: Phone Number */}
+              <View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: '#1A1A1A',
+                    marginBottom: 7,
+                  }}
+                >
+                  Phone Number
                 </Text>
                 <View
                   style={{
@@ -835,11 +935,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       color: '#1A1A1A',
                       padding: 0,
                     }}
-                    placeholder="Enter your phone number or email"
+                    placeholder="Enter your mobile number (e.g. 077 123 4567)"
                     placeholderTextColor="#9CA3AF"
-                    value={identifier}
-                    onChangeText={setIdentifier}
-                    autoCapitalize="none"
+                    value={registerPhone}
+                    onChangeText={setRegisterPhone}
+                    keyboardType="phone-pad"
                   />
                 </View>
               </View>
@@ -1242,6 +1342,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               {/* Primary Create Account Button */}
               <Pressable
                 onPress={handleRegisterSubmit}
+                disabled={authLoading}
                 style={({ pressed }) => [
                   {
                     height: 50,
@@ -1251,22 +1352,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     justifyContent: 'center',
                     marginTop: 8,
                   },
+                  authLoading && { opacity: 0.75 },
                   pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: '700',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  {registerRole === 'driver'
-                    ? 'Register as Delivery Rider'
-                    : registerRole === 'farmer'
-                    ? 'Register as Farmer'
-                    : 'Create Buyer Account'}
-                </Text>
+                {authLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: '700',
+                      color: '#FFFFFF',
+                    }}
+                  >
+                    {registerRole === 'driver'
+                      ? 'Register as Delivery Rider'
+                      : registerRole === 'farmer'
+                      ? 'Register as Farmer'
+                      : 'Create Buyer Account'}
+                  </Text>
+                )}
               </Pressable>
             </View>
           )}

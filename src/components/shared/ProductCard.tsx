@@ -18,7 +18,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onSelect,
   compact = false,
 }) => {
-  const { addToCart, goToSubScreen } = useApp();
+  const { currentUser, openAuth, addToCart, goToSubScreen } = useApp();
   const [justAdded, setJustAdded] = React.useState(false);
   const [isSellerModalOpen, setIsSellerModalOpen] = React.useState(false);
 
@@ -29,6 +29,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleAddToCart = (e?: any) => {
     e?.stopPropagation?.();
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     addToCart(listing, 1);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);

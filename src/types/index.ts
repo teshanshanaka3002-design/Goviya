@@ -4,6 +4,7 @@ export type Role = 'buyer' | 'farmer' | 'driver' | 'admin';
 
 export interface User {
   _id: string;
+  uid?: string;
   role: Role;
   name: string;
   phone: string;
@@ -16,16 +17,20 @@ export interface User {
     town?: string;
     address: string;
   };
+  district?: string;
   verified: boolean;
   nicNumber?: string;
   farmName?: string;
   farmSizeAcres?: number;
   yearsFarming?: number;
+  drivingLicenceNumber?: string;
+  drivingLicense?: string;
   vehicleType?: 'Three-Wheeler' | 'Light Truck (Dimas)' | 'Motorbike' | 'Lorry';
   vehiclePlate?: string;
   rating?: number;
   totalRatings?: number;
   createdAt: string;
+  updatedAt?: string;
   isDeactivated?: boolean;
   isOnline?: boolean;
   verificationDocuments?: {
@@ -60,6 +65,9 @@ export interface Listing {
   quantityKg: number;
   minOrderKg: number;
   pricePerKg: number; // in LKR
+  price?: number; // Alias for pricePerKg in Firestore
+  quantity?: number; // Alias for quantityKg in Firestore
+  unit?: string; // Unit string, e.g. "kg"
   originalPricePerKg?: number; // Pre-discount price
   discountPercent?: number; // Discount percentage (e.g. 20, 25)
   isOffer?: boolean; // Promotional or bundle offer
@@ -76,6 +84,9 @@ export interface Listing {
     town: string;
   };
   isOrganic?: boolean;
+  organic?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type OrderStatus =

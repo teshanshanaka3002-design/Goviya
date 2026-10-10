@@ -1,0 +1,88 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentUser() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && currentUser().role == 'admin';
+    }
+
+    function isVerifiedFarmer() {
+      return signedIn()
+        && currentUser().role == 'farmer'
+        && currentUser().verified == true
+        && currentUser().isDeactivated == false;
+    }
+
+    match /users/{userId} {
+
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data._id == request.auth.uid
+        && request.resource.data.role in ['buyer', 'farmer', 'driver']
+        && request.resource.data.isDeactivated == false
+        && (
+          (
+            request.resource.data.role == 'buyer'
+            && request.resource.data.verified == true
+          )
+          ||
+          (
+            request.resource.data.role in ['farmer', 'driver']
+            && request.resource.data.verified == false
+          )
+        );
+
+      allow update: if isAdmin() ||
+        (
+          signedIn()
+          && request.auth.uid == userId
+          && !request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasAny([
+              'uid',
+              '_id',
+              'role',
+              'verified',
+              'isDeactivated'
+            ])
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /listings/{listingId} {
+
+      // Guests may read ACTIVE products.
+      // Authenticated users may read listings needed by the app.
+      allow read: if
+        resource.data.status == 'active'
+        || signedIn();
+
+      // Only verified, active Farmers may create their own listings.
+      allow create: if isVerifiedFarmer()
+        && request.resource.data.farmerId == request.auth.uid;
+
+      // Farmer can edit/delete only their own listing.
+      // Admin can manage any listing.
+      allow update, delete: if isAdmin() ||
+        (
+          isVerifiedFarmer()
+          && resource.data.farmerId == request.auth.uid
+        );
+    }
+  }
+}

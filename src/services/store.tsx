@@ -3,6 +3,7 @@ import {
   User,
   Role,
   Listing,
+  ListingStatus,
   Order,
   OrderStatus,
   Conversation,
@@ -14,7 +15,6 @@ import {
 } from '../types';
 import {
   mockUsers,
-  mockListings,
   mockOrders,
   mockConversations,
   mockChatMessages,
@@ -25,16 +25,33 @@ import {
 } from './mockData';
 import { DEFAULT_FARMER_AVATAR, GAMINI_FARMER_AVATAR, KAVINDA_FARMER_AVATAR } from './farmerAvatarData';
 import {
+  auth,
+  isFirebaseConfigured,
+  formatAuthError,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  updateProfile,
+} from './firebase';
+import {
   db,
   doc,
   collection,
+  addDoc,
+  getDoc,
+  getDocs,
   onSnapshot,
   updateDoc,
   setDoc,
+  deleteDoc,
+  query,
+  where,
+  serverTimestamp,
   syncOrdersToFirestore,
 } from './firestore';
 
-export { db, doc, collection, onSnapshot, updateDoc, setDoc };
+export { db, doc, collection, onSnapshot, updateDoc, setDoc, deleteDoc, auth, isFirebaseConfigured };
 
 export interface PlaceOrderInput {
   deliveryType?: 'delivery' | 'pickup';
@@ -94,14 +111,17 @@ interface AppContextType {
   isSimulatorFrame: boolean;
   toggleSimulatorFrame: () => void;
   // Auth & Nav
+  authLoading: boolean;
+  authError: string | null;
   authTargetRole: Role | null;
   openAuth: (targetRole?: Role, view?: 'login' | 'register') => void;
   switchRole: (role: Role) => void;
   continueAsGuest: () => void;
   loginAsUser: (userId: string) => void;
   loginAsRole: (role: Role) => void;
-  registerUser: (userData: Partial<User>) => void;
-  logout: () => void;
+  login: (identifier: string, password: string) => Promise<User>;
+  registerUser: (userData: Partial<User>, password?: string) => Promise<User>;
+  logout: () => Promise<void>;
   setTab: (tab: string) => void;
   goToSubScreen: (
     subScreen: string | null,
@@ -133,7 +153,7 @@ interface AppContextType {
   driverConfirmDelivery: (orderId: string, proofNote?: string) => void;
   buyerConfirmPickup: (orderId: string) => void;
   // Listings
-  addListing: (listingData: Omit<Listing, '_id' | 'farmerId' | 'farmerName' | 'farmerPhone' | 'farmerRating'>) => void;
+  addListing: (listingData: Omit<Listing, '_id' | 'farmerId' | 'farmerName' | 'farmerPhone' | 'farmerRating'>) => Promise<string>;
   updateListingStatus: (listingId: string, status: 'active' | 'out_of_stock' | 'removed') => void;
   updateListingPhotos: (listingId: string, photos: string[]) => void;
   deleteListingPhoto: (listingId: string, photoIndex: number) => void;
@@ -189,6 +209,26 @@ const safeStorage = {
   },
 };
 
+const formatTimestamp = (ts: any): string => {
+  if (ts && typeof ts.toDate === 'function') {
+    return ts.toDate().toISOString();
+  }
+  if (typeof ts === 'string') {
+    return ts;
+  }
+  return new Date().toISOString();
+};
+
+const formatOptionalTimestamp = (ts: any): string | undefined => {
+  if (ts && typeof ts.toDate === 'function') {
+    return ts.toDate().toISOString();
+  }
+  if (typeof ts === 'string') {
+    return ts;
+  }
+  return undefined;
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Simulator frame toggle
   const [isSimulatorFrame, setIsSimulatorFrame] = useState<boolean>(() => {
@@ -211,6 +251,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [authTargetRole, setAuthTargetRole] = useState<Role | null>(null);
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Navigation State
   const [navState, setNavState] = useState<NavigationState>(() => {
@@ -253,18 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [listings, setListings] = useState<Listing[]>(() => {
-    const saved = safeStorage.getItem(STORAGE_PREFIX + 'listings');
-    if (!saved) return mockListings;
-    try {
-      const parsed: Listing[] = JSON.parse(saved);
-      const existingIds = new Set(parsed.map(l => l._id));
-      const missingMocks = mockListings.filter(l => !existingIds.has(l._id));
-      return [...parsed, ...missingMocks];
-    } catch (e) {
-      return mockListings;
-    }
-  });
+  const [listings, setListings] = useState<Listing[]>([]);
 
   const [orders, setOrders] = useState<Order[]>(() => {
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'orders');
@@ -334,9 +365,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncOrdersToFirestore(orders);
   }, [orders]);
 
-  useEffect(() => {
-    safeStorage.setItem(STORAGE_PREFIX + 'listings', JSON.stringify(listings));
-  }, [listings]);
 
   useEffect(() => {
     safeStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(complaints));
@@ -357,6 +385,128 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     safeStorage.setItem(STORAGE_PREFIX + 'categories', JSON.stringify(categories));
   }, [categories]);
+
+  // ----------------------------------------------------
+  // Firebase Auth State Listener (Session Restoration)
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userSnap = await getDoc(userDocRef);
+
+          if (userSnap.exists()) {
+            const data = userSnap.data();
+            const appUser: User = {
+              _id: firebaseUser.uid,
+              uid: firebaseUser.uid,
+              name: data.name || firebaseUser.displayName || 'Goviya User',
+              email: data.email || firebaseUser.email || undefined,
+              phone: data.phone || '',
+              role: (data.role as Role) || 'buyer',
+              verified: Boolean(data.verified),
+              isDeactivated: Boolean(data.isDeactivated),
+              createdAt: formatTimestamp(data.createdAt),
+              updatedAt: formatOptionalTimestamp(data.updatedAt),
+              avatarUrl: data.avatarUrl,
+              location: data.location,
+              district: data.district || data.location?.district,
+              nicNumber: data.nicNumber,
+              farmName: data.farmName,
+              farmSizeAcres: data.farmSizeAcres,
+              yearsFarming: data.yearsFarming,
+              drivingLicenceNumber: data.drivingLicenceNumber || data.drivingLicense,
+              drivingLicense: data.drivingLicenceNumber || data.drivingLicense,
+              vehicleType: data.vehicleType,
+              vehiclePlate: data.vehiclePlate,
+              rating: data.rating,
+              totalRatings: data.totalRatings,
+            };
+            setCurrentUser(appUser);
+          }
+        } catch (err) {
+          console.warn('Error restoring user session from Firestore:', err);
+        }
+      } else {
+        // Guest mode (unauthenticated)
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // ----------------------------------------------------
+  // Firestore Real-Time Listings Listener
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
+    // When there is NO authenticated user, query Firestore using:
+    // query(collection(db, 'listings'), where('status', '==', 'active'))
+    // Do not request the whole listings collection for guests.
+    const isAuthed = Boolean(auth.currentUser);
+    const listingsQuery = isAuthed
+      ? collection(db, 'listings')
+      : query(collection(db, 'listings'), where('status', '==', 'active'));
+
+    const unsubscribe = onSnapshot(
+      listingsQuery,
+      (snapshot) => {
+        const firestoreListings: Listing[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          const priceVal = Number(data.pricePerKg ?? data.price ?? 0);
+          const qtyVal = Number(data.quantityKg ?? data.quantity ?? 0);
+          const minOrderVal = Number(data.minOrderKg ?? 1);
+          return {
+            _id: docSnap.id,
+            farmerId: data.farmerId || '',
+            farmerName: data.farmerName || 'Farmer',
+            farmerPhone: data.farmerPhone || '',
+            farmerRating: data.farmerRating ?? 5.0,
+            cropName: data.cropName || '',
+            category: data.category || 'Vegetables',
+            quantityKg: qtyVal,
+            minOrderKg: minOrderVal,
+            pricePerKg: priceVal,
+            price: priceVal,
+            quantity: qtyVal,
+            unit: data.unit || 'kg',
+            originalPricePerKg: data.originalPricePerKg !== undefined ? Number(data.originalPricePerKg) : undefined,
+            discountPercent: data.discountPercent !== undefined ? Number(data.discountPercent) : undefined,
+            isOffer: Boolean(data.isOffer),
+            offerBadge: data.offerBadge,
+            offerTitle: data.offerTitle,
+            harvestDate: data.harvestDate || new Date().toISOString().split('T')[0],
+            photos: Array.isArray(data.photos) && data.photos.length > 0 ? data.photos : [],
+            description: data.description || '',
+            status: (data.status as ListingStatus) || 'active',
+            location: data.location || {
+              lat: 6.9697,
+              lng: 80.7891,
+              district: 'Nuwara Eliya',
+              town: 'Kandapola',
+            },
+            isOrganic: Boolean(data.isOrganic ?? data.organic),
+            organic: Boolean(data.organic ?? data.isOrganic),
+            createdAt: formatTimestamp(data.createdAt),
+            updatedAt: formatOptionalTimestamp(data.updatedAt),
+          };
+        });
+
+        // Set ONLY Firestore listings. Do NOT merge with mock listings.
+        setListings(firestoreListings);
+      },
+      (error) => {
+        console.error('FIRESTORE LISTING SNAPSHOT ERROR:', error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
 
   // Actions
   const toggleSimulatorFrame = () => {
@@ -437,50 +587,284 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const registerUser = (userData: Partial<User>) => {
-    const newUser: User = {
-      _id: `user_${Date.now()}`,
-      role: userData.role || 'buyer',
-      name: userData.name || 'New User',
-      phone: userData.phone || '+94 77 000 0000',
-      email: userData.email,
-      verified: userData.role === 'buyer', // farmers require admin verification
-      createdAt: new Date().toISOString(),
-      location: userData.location || {
-        lat: 6.9271,
-        lng: 79.8612,
-        district: 'Colombo',
-        address: 'Colombo, Western Province',
-      },
-      ...userData,
-    };
-    setUsers(prev => [newUser, ...prev]);
-    setCurrentUser(newUser);
-    setAuthTargetRole(null);
-    const defaultTab = newUser.role === 'admin' ? 'dashboard' : 'home';
-    setNavState({
-      role: newUser.role,
-      activeTab: defaultTab,
-      subScreen: null,
-      selectedListingId: null,
-      selectedOrderId: null,
-      selectedConversationId: null,
-    });
+  const login = async (identifier: string, password: string): Promise<User> => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const raw = identifier.trim();
+      let emailToUse = raw;
+
+      // In Sri Lanka, users frequently enter phone numbers instead of email to sign in
+      if (!raw.includes('@')) {
+        if (isFirebaseConfigured) {
+          try {
+            const usersRef = collection(db, 'users');
+            const q = query(usersRef, where('phone', '==', raw));
+            const qSnap = await getDocs(q);
+            if (!qSnap.empty && qSnap.docs[0].data().email) {
+              emailToUse = qSnap.docs[0].data().email;
+            } else {
+              // Try matching phone digits
+              const digits = raw.replace(/\D/g, '');
+              const allUsersSnap = await getDocs(usersRef);
+              const matchedDoc = allUsersSnap.docs.find(d => {
+                const p = (d.data().phone || '').replace(/\D/g, '');
+                return p.length >= 7 && (p.includes(digits) || digits.includes(p));
+              });
+              if (matchedDoc && matchedDoc.data().email) {
+                emailToUse = matchedDoc.data().email;
+              }
+            }
+          } catch {}
+        }
+      }
+
+      if (!isFirebaseConfigured) {
+        // Fallback for local preview when Firebase credentials have not yet been placed in .env
+        const found = users.find(u =>
+          u.email?.toLowerCase() === raw.toLowerCase() ||
+          u.phone.replace(/\D/g, '').includes(raw.replace(/\D/g, '')) ||
+          u.name.toLowerCase() === raw.toLowerCase()
+        ) || mockUsers[0];
+        setCurrentUser(found);
+        setAuthTargetRole(null);
+        setNavState({
+          role: found.role,
+          activeTab: found.role === 'admin' ? 'dashboard' : 'home',
+          subScreen: null,
+          selectedListingId: null,
+          selectedOrderId: null,
+          selectedConversationId: null,
+        });
+        return found;
+      }
+
+      const cred = await signInWithEmailAndPassword(auth, emailToUse.toLowerCase(), password);
+      const fbUser = cred.user;
+
+      // Fetch user profile from Firestore: users/{uid}
+      const userDocRef = doc(db, 'users', fbUser.uid);
+      const userSnap = await getDoc(userDocRef);
+
+      let loggedInUser: User;
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        loggedInUser = {
+          _id: fbUser.uid,
+          uid: fbUser.uid,
+          name: data.name || fbUser.displayName || 'Goviya User',
+          email: data.email || fbUser.email || undefined,
+          phone: data.phone || '',
+          role: (data.role as Role) || 'buyer',
+          verified: Boolean(data.verified),
+          isDeactivated: Boolean(data.isDeactivated),
+          createdAt: formatTimestamp(data.createdAt),
+          updatedAt: formatOptionalTimestamp(data.updatedAt),
+          avatarUrl: data.avatarUrl,
+          location: data.location,
+          district: data.district || data.location?.district,
+          nicNumber: data.nicNumber,
+          farmName: data.farmName,
+          farmSizeAcres: data.farmSizeAcres,
+          yearsFarming: data.yearsFarming,
+          drivingLicenceNumber: data.drivingLicenceNumber || data.drivingLicense,
+          drivingLicense: data.drivingLicenceNumber || data.drivingLicense,
+          vehicleType: data.vehicleType,
+          vehiclePlate: data.vehiclePlate,
+          rating: data.rating,
+          totalRatings: data.totalRatings,
+        };
+      } else {
+        loggedInUser = {
+          _id: fbUser.uid,
+          uid: fbUser.uid,
+          name: fbUser.displayName || 'Goviya User',
+          email: fbUser.email || undefined,
+          phone: '',
+          role: 'buyer',
+          verified: true,
+          createdAt: new Date().toISOString(),
+        };
+      }
+
+      setCurrentUser(loggedInUser);
+      setAuthTargetRole(null);
+      const defaultTab = loggedInUser.role === 'admin' ? 'dashboard' : 'home';
+      setNavState({
+        role: loggedInUser.role,
+        activeTab: defaultTab,
+        subScreen: null,
+        selectedListingId: null,
+        selectedOrderId: null,
+        selectedConversationId: null,
+      });
+
+      return loggedInUser;
+    } catch (err: any) {
+      const formatted = formatAuthError(err);
+      setAuthError(formatted);
+      throw new Error(formatted);
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
-  const logout = () => {
-    setCurrentUser(null);
-    setAuthTargetRole(null);
-    setNavState({
-      role: 'buyer',
-      activeTab: 'home',
-      subScreen: null,
-      selectedListingId: null,
-      selectedOrderId: null,
-      selectedConversationId: null,
-      selectedUserId: null,
-      selectedComplaintId: null,
-    });
+  const registerUser = async (userData: Partial<User>, password?: string): Promise<User> => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      // Security Rule: New users must NOT be able to register themselves as admin
+      const targetRole: Role = userData.role === 'admin' ? 'buyer' : (userData.role || 'buyer');
+
+      // Security Rule: Farmer and Driver accounts start with verified: false. Buyer starts verified: true
+      const isVerified = targetRole === 'buyer';
+
+      // Strict separation of email and phone fields
+      const cleanEmail = (userData.email || '').trim().toLowerCase();
+      const cleanPhone = (userData.phone || '').trim();
+
+      if (!cleanEmail || !cleanEmail.includes('@')) {
+        throw new Error('A valid email address is required for registration.');
+      }
+      if (!cleanPhone) {
+        throw new Error('A valid contact phone number is required.');
+      }
+
+      const pwd = password || 'Goviya@2026!';
+      let newUid = `user_${Date.now()}`;
+
+      if (isFirebaseConfigured) {
+        // Register in Firebase Auth strictly using email + password (never phone)
+        const cred = await createUserWithEmailAndPassword(auth, cleanEmail, pwd);
+        newUid = cred.user.uid;
+
+        try {
+          if (userData.name) {
+            await updateProfile(cred.user, { displayName: userData.name });
+          }
+        } catch {}
+      }
+
+      const nowIso = new Date().toISOString();
+
+      // Cloud Firestore document: users/{uid} (Do NOT store passwords)
+      // email contains ONLY email; phone contains ONLY phone.
+      const userDocData: Record<string, any> = {
+        uid: newUid,
+        _id: newUid,
+        name: userData.name || 'New User',
+        email: cleanEmail,
+        phone: cleanPhone,
+        role: targetRole,
+        verified: isVerified,
+        isDeactivated: false,
+        createdAt: isFirebaseConfigured ? serverTimestamp() : nowIso,
+        updatedAt: isFirebaseConfigured ? serverTimestamp() : nowIso,
+        location: userData.location || {
+          lat: 6.9271,
+          lng: 79.8612,
+          district: userData.district || 'Colombo',
+          address: `${userData.district || 'Colombo'}, Sri Lanka`,
+        },
+        district: userData.district || userData.location?.district || 'Colombo',
+      };
+
+      if (userData.avatarUrl) {
+        userDocData.avatarUrl = userData.avatarUrl;
+      }
+
+      // Role-specific fields: Farmer
+      if (targetRole === 'farmer') {
+        userDocData.nicNumber = userData.nicNumber || '';
+        userDocData.farmName = userData.farmName || '';
+        userDocData.district = userData.district || userData.location?.district || 'Nuwara Eliya';
+        userDocData.farmSizeAcres = userData.farmSizeAcres || 3.0;
+        userDocData.yearsFarming = userData.yearsFarming || 5;
+      } else if (targetRole === 'driver') {
+        // Role-specific fields: Driver
+        userDocData.drivingLicenceNumber = userData.drivingLicenceNumber || userData.drivingLicense || '';
+        userDocData.vehicleType = userData.vehicleType || 'Light Truck (Dimas)';
+        userDocData.vehiclePlate = userData.vehiclePlate || '';
+      }
+
+      if (isFirebaseConfigured) {
+        const userDocRef = doc(db, 'users', newUid);
+        await setDoc(userDocRef, userDocData);
+      }
+
+      const newUser: User = {
+        _id: newUid,
+        uid: newUid,
+        role: targetRole,
+        name: userDocData.name,
+        phone: cleanPhone,
+        email: cleanEmail,
+        verified: isVerified,
+        isDeactivated: false,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        location: userDocData.location,
+        district: userDocData.district,
+        nicNumber: userDocData.nicNumber,
+        farmName: userDocData.farmName,
+        farmSizeAcres: userDocData.farmSizeAcres,
+        yearsFarming: userDocData.yearsFarming,
+        drivingLicenceNumber: userDocData.drivingLicenceNumber,
+        drivingLicense: userDocData.drivingLicenceNumber,
+        vehicleType: userDocData.vehicleType,
+        vehiclePlate: userDocData.vehiclePlate,
+        rating: 5.0,
+        totalRatings: 1,
+      };
+
+      setUsers(prev => [newUser, ...prev]);
+      setCurrentUser(newUser);
+      setAuthTargetRole(null);
+
+      const defaultTab = newUser.role === 'admin' ? 'dashboard' : 'home';
+      setNavState({
+        role: newUser.role,
+        activeTab: defaultTab,
+        subScreen: null,
+        selectedListingId: null,
+        selectedOrderId: null,
+        selectedConversationId: null,
+      });
+
+      return newUser;
+    } catch (err: any) {
+      const formatted = formatAuthError(err);
+      setAuthError(formatted);
+      throw new Error(formatted);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      if (isFirebaseConfigured && auth.currentUser) {
+        await signOut(auth);
+      }
+    } catch (err) {
+      console.warn('Firebase signOut error:', err);
+    } finally {
+      setCurrentUser(null);
+      setAuthTargetRole(null);
+      setNavState({
+        role: 'buyer',
+        activeTab: 'home',
+        subScreen: null,
+        selectedListingId: null,
+        selectedOrderId: null,
+        selectedConversationId: null,
+        selectedUserId: null,
+        selectedComplaintId: null,
+      });
+      setAuthLoading(false);
+    }
   };
 
   const setTab = (tab: string) => {
@@ -538,6 +922,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Cart operations
   const addToCart = (listing: Listing, quantityKg: number) => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
     setCart(prev => {
       const existing = prev.find(item => item.listing._id === listing._id);
       if (existing) {
@@ -573,6 +961,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Order operations
   const placeOrder = (input: PlaceOrderInput): Order => {
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      throw new Error('Please log in or register before placing an order.');
+    }
     if (cart.length === 0) {
       throw new Error('Cart is empty');
     }
@@ -1037,80 +1429,287 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
-  const addListing = (
+  const addListing = async (
     listingData: Omit<Listing, '_id' | 'farmerId' | 'farmerName' | 'farmerPhone' | 'farmerRating'>
-  ) => {
-    if (!currentUser) return;
-    const newListing: Listing = {
-      _id: `list_${Date.now()}`,
-      farmerId: currentUser._id,
-      farmerName: currentUser.name,
-      farmerPhone: currentUser.phone,
-      farmerRating: currentUser.rating || 5.0,
-      ...listingData,
+  ): Promise<string> => {
+    console.log(
+      'Firebase project:',
+      db.app.options.projectId
+    );
+
+    console.log(
+      'Creating listing for farmer:',
+      auth.currentUser?.uid
+    );
+
+    console.log(
+      'Writing to Firestore listings collection...'
+    );
+
+    if (!auth.currentUser && !currentUser) {
+      openAuth('farmer', 'login');
+      const err = new Error('Please log in as a farmer to create a listing.');
+      console.error('FIRESTORE LISTING ERROR:', err);
+      throw err;
+    }
+
+    const currentFarmerUid = auth.currentUser?.uid || currentUser?.uid || currentUser?._id;
+    if (!currentFarmerUid) {
+      const err = new Error('No farmer authentication session found.');
+      console.error('FIRESTORE LISTING ERROR:', err);
+      throw err;
+    }
+
+    // Refresh farmer verification state from Firestore if needed
+    let isFarmerVerified = currentUser?.verified ?? false;
+    let isFarmerDeactivated = currentUser?.isDeactivated ?? false;
+    if (isFirebaseConfigured && auth.currentUser) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (uSnap.exists()) {
+          const uData = uSnap.data();
+          if (uData.verified !== undefined) {
+            isFarmerVerified = Boolean(uData.verified);
+          }
+          if (uData.isDeactivated !== undefined) {
+            isFarmerDeactivated = Boolean(uData.isDeactivated);
+          }
+          if (
+            currentUser &&
+            (currentUser.verified !== isFarmerVerified || currentUser.isDeactivated !== isFarmerDeactivated)
+          ) {
+            setCurrentUser(prev => prev ? { ...prev, verified: isFarmerVerified, isDeactivated: isFarmerDeactivated } : null);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not refresh farmer user document:', err);
+      }
+    }
+
+    if (!isFarmerVerified) {
+      const error = new Error('Your farmer account is pending verification in Firestore (verified: false). An administrator must verify your account before you can publish listings.');
+      console.error('FIRESTORE LISTING ERROR:', error);
+      throw error;
+    }
+
+    if (isFarmerDeactivated) {
+      const error = new Error('Your farmer account is currently deactivated.');
+      console.error('FIRESTORE LISTING ERROR:', error);
+      throw error;
+    }
+
+    const p = Number(listingData.pricePerKg ?? (listingData as any).price ?? 0);
+    const q = Number(listingData.quantityKg ?? (listingData as any).quantity ?? 0);
+    const m = Number(listingData.minOrderKg ?? 1);
+
+    const docPayload: Record<string, any> = {
+      farmerId: currentFarmerUid,
+      farmerName: currentUser?.name || auth.currentUser?.displayName || 'Farmer',
+      farmerPhone: currentUser?.phone || '',
+      farmerRating: currentUser?.rating ?? 5.0,
+      cropName: listingData.cropName || '',
+      category: listingData.category || 'Vegetables',
+      price: p,
+      pricePerKg: p,
+      quantity: q,
+      quantityKg: q,
+      unit: listingData.unit || 'kg',
+      minOrderKg: m,
+      description: listingData.description || '',
+      location: listingData.location || {
+        lat: currentUser?.location?.lat || 6.9697,
+        lng: currentUser?.location?.lng || 80.7891,
+        district: currentUser?.district || currentUser?.location?.district || 'Nuwara Eliya',
+        town: currentUser?.location?.town || 'Kandapola',
+      },
+      photos: Array.isArray(listingData.photos) ? listingData.photos : [],
+      status: (listingData.status as ListingStatus) || 'active',
+      isOrganic: Boolean(listingData.isOrganic),
+      organic: Boolean(listingData.isOrganic),
+      harvestDate: listingData.harvestDate || new Date().toISOString().split('T')[0],
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     };
-    setListings(prev => [newListing, ...prev]);
+
+    if (listingData.originalPricePerKg !== undefined) {
+      docPayload.originalPricePerKg = listingData.originalPricePerKg;
+    }
+    if (listingData.discountPercent !== undefined) {
+      docPayload.discountPercent = listingData.discountPercent;
+    }
+    if (listingData.isOffer !== undefined) {
+      docPayload.isOffer = listingData.isOffer;
+    }
+    if (listingData.offerBadge !== undefined) {
+      docPayload.offerBadge = listingData.offerBadge;
+    }
+    if (listingData.offerTitle !== undefined) {
+      docPayload.offerTitle = listingData.offerTitle;
+    }
+
+    try {
+      const ref = await addDoc(collection(db, 'listings'), docPayload);
+      console.log('Firestore listing created:', ref.id);
+      return ref.id;
+    } catch (error) {
+      console.error('FIRESTORE LISTING ERROR:', error);
+      throw error;
+    }
   };
 
-  const updateListingStatus = (listingId: string, status: 'active' | 'out_of_stock' | 'removed') => {
+  const updateListingStatus = async (listingId: string, status: 'active' | 'out_of_stock' | 'removed') => {
     setListings(prev =>
-      prev.map(l => (l._id === listingId ? { ...l, status } : l))
+      prev.map(l => (l._id === listingId ? { ...l, status, updatedAt: new Date().toISOString() } : l))
     );
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'listings', listingId), {
+          status,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error updating listing status in Firestore:', err);
+      }
+    }
   };
 
-  const updateListingPhotos = (listingId: string, photos: string[]) => {
+  const updateListingPhotos = async (listingId: string, photos: string[]) => {
     setListings(prev =>
-      prev.map(l => (l._id === listingId ? { ...l, photos } : l))
+      prev.map(l => (l._id === listingId ? { ...l, photos, updatedAt: new Date().toISOString() } : l))
     );
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'listings', listingId), {
+          photos,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error updating listing photos in Firestore:', err);
+      }
+    }
   };
 
-  const deleteListingPhoto = (listingId: string, photoIndex: number) => {
+  const deleteListingPhoto = async (listingId: string, photoIndex: number) => {
+    let updatedPhotos: string[] = [];
     setListings(prev =>
       prev.map(l => {
         if (l._id !== listingId) return l;
         const currentPhotos = l.photos || [];
-        const newPhotos = currentPhotos.filter((_, idx) => idx !== photoIndex);
-        return { ...l, photos: newPhotos };
+        updatedPhotos = currentPhotos.filter((_, idx) => idx !== photoIndex);
+        return { ...l, photos: updatedPhotos, updatedAt: new Date().toISOString() };
       })
     );
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'listings', listingId), {
+          photos: updatedPhotos,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error deleting listing photo in Firestore:', err);
+      }
+    }
   };
 
-  const addListingPhoto = (listingId: string, photoUrl: string) => {
+  const addListingPhoto = async (listingId: string, photoUrl: string) => {
+    let updatedPhotos: string[] = [];
     setListings(prev =>
       prev.map(l => {
         if (l._id !== listingId) return l;
         const currentPhotos = l.photos || [];
-        return { ...l, photos: [...currentPhotos, photoUrl] };
+        updatedPhotos = [...currentPhotos, photoUrl];
+        return { ...l, photos: updatedPhotos, updatedAt: new Date().toISOString() };
       })
     );
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'listings', listingId), {
+          photos: updatedPhotos,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error adding listing photo in Firestore:', err);
+      }
+    }
   };
 
-  const setListingCoverPhoto = (listingId: string, photoIndex: number) => {
+  const setListingCoverPhoto = async (listingId: string, photoIndex: number) => {
+    let updatedPhotos: string[] = [];
     setListings(prev =>
       prev.map(l => {
         if (l._id !== listingId) return l;
         const currentPhotos = [...(l.photos || [])];
         if (photoIndex < 0 || photoIndex >= currentPhotos.length) return l;
         const [selected] = currentPhotos.splice(photoIndex, 1);
-        return { ...l, photos: [selected, ...currentPhotos] };
+        updatedPhotos = [selected, ...currentPhotos];
+        return { ...l, photos: updatedPhotos, updatedAt: new Date().toISOString() };
       })
     );
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'listings', listingId), {
+          photos: updatedPhotos,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error setting cover photo in Firestore:', err);
+      }
+    }
   };
 
-  const clearListingPhotos = (listingId: string) => {
+  const clearListingPhotos = async (listingId: string) => {
     setListings(prev =>
-      prev.map(l => (l._id === listingId ? { ...l, photos: [] } : l))
+      prev.map(l => (l._id === listingId ? { ...l, photos: [], updatedAt: new Date().toISOString() } : l))
     );
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'listings', listingId), {
+          photos: [],
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error clearing listing photos in Firestore:', err);
+      }
+    }
   };
 
-  const deleteListing = (listingId: string) => {
+  const deleteListing = async (listingId: string) => {
     setListings(prev => prev.filter(l => l._id !== listingId));
+    if (isFirebaseConfigured) {
+      try {
+        await deleteDoc(doc(db, 'listings', listingId));
+      } catch (err) {
+        console.warn('Error deleting listing from Firestore:', err);
+      }
+    }
   };
 
-  const updateListing = (listingId: string, data: Partial<Listing>) => {
+  const updateListing = async (listingId: string, data: Partial<Listing>) => {
     setListings(prev =>
-      prev.map(l => (l._id === listingId ? { ...l, ...data } : l))
+      prev.map(l => (l._id === listingId ? { ...l, ...data, updatedAt: new Date().toISOString() } : l))
     );
+    if (isFirebaseConfigured) {
+      try {
+        const updateData: Record<string, any> = {
+          ...data,
+          updatedAt: serverTimestamp(),
+        };
+        if (data.pricePerKg !== undefined) {
+          updateData.price = data.pricePerKg;
+        }
+        if (data.quantityKg !== undefined) {
+          updateData.quantity = data.quantityKg;
+        }
+        if (data.isOrganic !== undefined) {
+          updateData.organic = data.isOrganic;
+        }
+        delete updateData._id;
+
+        await updateDoc(doc(db, 'listings', listingId), updateData);
+      } catch (err) {
+        console.warn('Error updating listing in Firestore:', err);
+      }
+    }
   };
 
   const sendMessage = (
@@ -1150,14 +1749,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     cropName?: string,
     targetRole?: Role
   ) => {
-    const activeUser = currentUser || {
-      _id: 'user_buyer_guest',
-      name: 'Guest Buyer',
-      phone: '+94 77 123 4567',
-      role: 'buyer' as Role,
-      verified: false,
-      createdAt: new Date().toISOString(),
-    };
+    if (!currentUser) {
+      openAuth('buyer', 'login');
+      return '';
+    }
+    const activeUser = currentUser;
 
     const existing = conversations.find(c =>
       c.participants.some(p => p.userId === targetId) &&
@@ -1204,10 +1800,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCategories(prev => prev.filter(c => c.id !== id));
   };
 
-  const adminVerifyUser = (userId: string, approved: boolean) => {
+  const adminVerifyUser = async (userId: string, approved: boolean) => {
     setUsers(prev =>
       prev.map(u => (u._id === userId ? { ...u, verified: approved } : u))
     );
+    if (currentUser?._id === userId || currentUser?.uid === userId) {
+      setCurrentUser(prev => prev ? { ...prev, verified: approved } : null);
+    }
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'users', userId), {
+          verified: approved,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn('Error updating user verification in Firestore:', err);
+      }
+    }
   };
 
   const adminToggleDeactivateUser = (userId: string) => {
@@ -1299,12 +1908,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         platformStats,
         isSimulatorFrame,
         toggleSimulatorFrame,
+        authLoading,
+        authError,
         authTargetRole,
         openAuth,
         switchRole,
         continueAsGuest,
         loginAsUser,
         loginAsRole,
+        login,
         registerUser,
         logout,
         setTab,
