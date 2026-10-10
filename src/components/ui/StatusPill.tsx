@@ -6,6 +6,7 @@ export interface StatusPillProps {
   status:
     | OrderStatus
     | 'pending'
+    | 'open'
     | 'confirmed'
     | 'accepted'
     | 'in_progress'
@@ -18,6 +19,7 @@ export interface StatusPillProps {
     | 'out_of_stock'
     | 'removed'
     | 'resolved'
+    | 'closed'
     | 'dismissed';
   label?: string;
   className?: string;
@@ -32,12 +34,12 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
   let dotColor = '#E8A317';
   let displayLabel = label;
 
-  if (norm === 'pending') {
+  if (norm === 'pending' || norm === 'open') {
     bgColor = '#FEF8EA';
     textColor = '#B45309';
     borderColor = '#FCE7C2';
     dotColor = '#E8A317';
-    displayLabel = label || 'Pending';
+    displayLabel = label || (norm === 'open' ? 'Open' : 'Pending');
   } else if (
     norm === 'confirmed' ||
     norm === 'accepted' ||
@@ -60,6 +62,8 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
         ? 'Preparing'
         : norm === 'accepted'
         ? 'Accepted'
+        : norm === 'in_progress'
+        ? 'In Progress'
         : 'Confirmed');
   } else if (norm === 'delivered' || norm === 'completed' || norm === 'active' || norm === 'resolved') {
     bgColor = '#E6F2E8';
@@ -67,12 +71,12 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status, label, className
     borderColor = '#C9E6D0';
     dotColor = '#1F5C3A';
     displayLabel = label || (norm === 'active' ? 'Active' : norm === 'resolved' ? 'Resolved' : 'Delivered');
-  } else if (norm === 'rejected' || norm === 'cancelled' || norm === 'out_of_stock' || norm === 'dismissed') {
-    bgColor = '#FDEEEB';
-    textColor = '#C8452D';
-    borderColor = '#F8C8BF';
-    dotColor = '#C8452D';
-    displayLabel = label || (norm === 'out_of_stock' ? 'Out of Stock' : norm === 'cancelled' ? 'Cancelled' : norm === 'dismissed' ? 'Dismissed' : 'Rejected');
+  } else if (norm === 'rejected' || norm === 'cancelled' || norm === 'out_of_stock' || norm === 'dismissed' || norm === 'closed') {
+    bgColor = norm === 'closed' ? '#F3F4F6' : '#FDEEEB';
+    textColor = norm === 'closed' ? '#4B5563' : '#C8452D';
+    borderColor = norm === 'closed' ? '#E5E7EB' : '#F8C8BF';
+    dotColor = norm === 'closed' ? '#6B7280' : '#C8452D';
+    displayLabel = label || (norm === 'closed' ? 'Closed' : norm === 'out_of_stock' ? 'Out of Stock' : norm === 'cancelled' ? 'Cancelled' : norm === 'dismissed' ? 'Dismissed' : 'Rejected');
   }
 
   return (

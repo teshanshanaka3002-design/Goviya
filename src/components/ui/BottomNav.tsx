@@ -28,7 +28,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ role }) => {
   const currentTab = navState.activeTab;
 
   const pendingOrdersCount = orders.filter(o => o.status === 'pending').length;
-  const pendingComplaintsCount = complaints.filter(c => c.status === 'pending').length;
+  const pendingComplaintsCount = complaints.filter(
+    c => c.status === 'open' || c.status === 'in_progress' || (c.status as string) === 'pending'
+  ).length;
   const pendingUsersCount = users.filter(u => !u.verified).length;
   const activeDeliveriesCount = orders.filter(
     o => o.status === 'ready_for_pickup' || o.status === 'out_for_delivery'

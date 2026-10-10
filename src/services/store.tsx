@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import {
   User,
   Role,
@@ -11,6 +11,9 @@ import {
   ChatMessage,
   MarketPriceRecord,
   Complaint,
+  SupportTicket,
+  TicketMessage,
+  TicketStatus,
   PlatformStat,
   CropCategory,
 } from '../types';
@@ -19,7 +22,6 @@ import {
   mockConversations,
   mockChatMessages,
   mockMarketPrices,
-  mockComplaints,
   mockPlatformStats,
   mockCategories,
 } from './mockData';
@@ -92,6 +94,7 @@ interface NavigationState {
   selectedConversationId: string | null;
   selectedUserId?: string | null;
   selectedComplaintId?: string | null;
+  selectedTicketId?: string | null;
   authRole?: Role;
   authView?: 'login' | 'register';
 }
@@ -107,6 +110,7 @@ interface AppContextType {
   messages: ChatMessage[];
   marketPrices: MarketPriceRecord[];
   complaints: Complaint[];
+  tickets: SupportTicket[];
   users: User[];
   categories: CropCategory[];
   platformStats: PlatformStat;
@@ -133,6 +137,7 @@ interface AppContextType {
       conversationId?: string;
       userId?: string;
       complaintId?: string;
+      ticketId?: string;
       initialRole?: Role;
       initialView?: 'login' | 'register';
     }
@@ -177,9 +182,18 @@ interface AppContextType {
   adminResolveComplaint: (complaintId: string, action: 'resolved' | 'dismissed', note: string) => void;
   adminWarnUser: (complaintId: string, note?: string) => void;
   adminRemoveListingFromComplaint: (complaintId: string, listingId: string, reason?: string) => void;
+  adminUpdateTicketStatus: (ticketId: string, status: TicketStatus, note?: string) => Promise<void>;
   // User profile & Support
   updateCurrentUser: (userData: Partial<User>) => void;
   fileComplaint: (complaintData: Omit<Complaint, '_id' | 'createdAt' | 'status'>) => Complaint;
+  raiseTicket: (ticketData: {
+    category: string;
+    subject: string;
+    description: string;
+    orderId?: string | null;
+  }) => Promise<SupportTicket>;
+  sendTicketMessage: (ticketId: string, message: string) => Promise<void>;
+  listenToTicketMessages: (ticketId: string, callback: (msgs: TicketMessage[]) => void) => () => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -211,9 +225,25 @@ const safeStorage = {
   },
 };
 
-const formatTimestamp = (ts: any): string => {
-  if (ts && typeof ts.toDate === 'function') {
-    return ts.toDate().toISOString();
+export const formatTimestamp = (ts: any): string => {
+  if (!ts) {
+    return new Date().toISOString();
+  }
+  if (typeof ts.toDate === 'function') {
+    try {
+      return ts.toDate().toISOString();
+    } catch {}
+  }
+  if (ts instanceof Date) {
+    return ts.toISOString();
+  }
+  if (typeof ts.seconds === 'number') {
+    try {
+      return new Date(ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000)).toISOString();
+    } catch {}
+  }
+  if (typeof ts === 'number') {
+    return new Date(ts).toISOString();
   }
   if (typeof ts === 'string') {
     return ts;
@@ -221,14 +251,60 @@ const formatTimestamp = (ts: any): string => {
   return new Date().toISOString();
 };
 
-const formatOptionalTimestamp = (ts: any): string | undefined => {
-  if (ts && typeof ts.toDate === 'function') {
-    return ts.toDate().toISOString();
+export const formatOptionalTimestamp = (ts: any): string | undefined => {
+  if (!ts) {
+    return undefined;
+  }
+  if (typeof ts.toDate === 'function') {
+    try {
+      return ts.toDate().toISOString();
+    } catch {}
+  }
+  if (ts instanceof Date) {
+    return ts.toISOString();
+  }
+  if (typeof ts.seconds === 'number') {
+    try {
+      return new Date(ts.seconds * 1000 + Math.floor((ts.nanoseconds || 0) / 1000000)).toISOString();
+    } catch {}
+  }
+  if (typeof ts === 'number') {
+    return new Date(ts).toISOString();
   }
   if (typeof ts === 'string') {
     return ts;
   }
   return undefined;
+};
+
+export const getTimestampMillis = (val: any): number => {
+  if (!val) return 0;
+  if (typeof val === 'number') return val;
+  if (val instanceof Date) return val.getTime();
+  if (typeof val.toDate === 'function') {
+    try {
+      return val.toDate().getTime();
+    } catch {
+      return 0;
+    }
+  }
+  if (typeof val.seconds === 'number') {
+    return val.seconds * 1000 + Math.floor((val.nanoseconds || 0) / 1000000);
+  }
+  if (typeof val === 'string') {
+    const parsed = Date.parse(val);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+};
+
+export const sortOrdersDesc = (a: Order, b: Order): number => {
+  const timeA = getTimestampMillis(a.createdAt);
+  const timeB = getTimestampMillis(b.createdAt);
+  if (timeB !== timeA) {
+    return timeB - timeA;
+  }
+  return (b._id || '').localeCompare(a._id || '');
 };
 
 export const mapFirestoreOrder = (docSnap: any): Order => {
@@ -287,6 +363,37 @@ export const mapFirestoreOrder = (docSnap: any): Order => {
   };
 };
 
+export const mapFirestoreUser = (docSnap: any): User => {
+  const data = docSnap.data();
+  const rawUid = data.uid || docSnap.id;
+  return {
+    _id: docSnap.id,
+    uid: rawUid,
+    name: data.name || (data.role === 'admin' ? 'Isuru Admin' : 'Goviya User'),
+    email: data.email || undefined,
+    phone: data.phone || '',
+    role: (data.role as Role) || 'buyer',
+    verified: Boolean(data.verified),
+    isDeactivated: Boolean(data.isDeactivated),
+    createdAt: formatTimestamp(data.createdAt),
+    updatedAt: formatOptionalTimestamp(data.updatedAt),
+    avatarUrl: data.avatarUrl,
+    location: data.location || (data.district ? { lat: 6.9271, lng: 79.8612, district: data.district, address: data.district } : undefined),
+    district: data.district || data.location?.district,
+    nicNumber: data.nicNumber,
+    farmName: data.farmName,
+    farmSizeAcres: data.farmSizeAcres !== undefined ? Number(data.farmSizeAcres) : undefined,
+    yearsFarming: data.yearsFarming !== undefined ? Number(data.yearsFarming) : undefined,
+    drivingLicenceNumber: data.drivingLicenceNumber || data.drivingLicense,
+    drivingLicense: data.drivingLicenceNumber || data.drivingLicense,
+    vehicleType: data.vehicleType,
+    vehiclePlate: data.vehiclePlate,
+    rating: data.rating !== undefined ? Number(data.rating) : 5.0,
+    totalRatings: data.totalRatings !== undefined ? Number(data.totalRatings) : 0,
+    verificationDocuments: data.verificationDocuments,
+  };
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Simulator frame toggle
   const [isSimulatorFrame, setIsSimulatorFrame] = useState<boolean>(() => {
@@ -329,26 +436,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Data Collections
   const [users, setUsers] = useState<User[]>(() => {
+    if (isFirebaseConfigured) return [];
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'users');
     if (!saved) return mockUsers;
     try {
-      const parsed: User[] = JSON.parse(saved);
-      const updated = parsed.map(u => {
-        if (u._id === 'user_farmer_1' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
-          return { ...u, avatarUrl: DEFAULT_FARMER_AVATAR };
-        }
-        if (u._id === 'user_pending_1' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
-          return { ...u, avatarUrl: GAMINI_FARMER_AVATAR };
-        }
-        if (u._id === 'user_pending_2' && (!u.avatarUrl || u.avatarUrl.includes('unsplash.com'))) {
-          return { ...u, avatarUrl: KAVINDA_FARMER_AVATAR };
-        }
-        return u;
-      });
-      const existingIds = new Set(updated.map(u => u._id));
-      const missingMocks = mockUsers.filter(u => !existingIds.has(u._id));
-      return [...updated, ...missingMocks];
-    } catch (e) {
+      return JSON.parse(saved);
+    } catch {
       return mockUsers;
     }
   });
@@ -374,18 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [marketPrices] = useState<MarketPriceRecord[]>(mockMarketPrices);
 
-  const [complaints, setComplaints] = useState<Complaint[]>(() => {
-    const saved = safeStorage.getItem(STORAGE_PREFIX + 'complaints');
-    if (!saved) return mockComplaints;
-    try {
-      const parsed: Complaint[] = JSON.parse(saved);
-      const existingIds = new Set(parsed.map(c => c._id));
-      const missingMocks = mockComplaints.filter(c => !existingIds.has(c._id));
-      return [...parsed, ...missingMocks];
-    } catch (e) {
-      return mockComplaints;
-    }
-  });
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
 
   const [categories, setCategories] = useState<CropCategory[]>(() => {
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'categories');
@@ -400,7 +482,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [platformStats] = useState<PlatformStat>(mockPlatformStats);
+  // Calculate platform statistics dynamically from real Firestore collections
+  const platformStats: PlatformStat = useMemo(() => {
+    const totalFarmers = users.filter(u => u.role === 'farmer').length;
+    const totalBuyers = users.filter(u => u.role === 'buyer').length;
+    const totalDrivers = users.filter(u => u.role === 'driver').length;
+    const totalTransactionsLkr = orders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const activeListingsCount = listings.filter(l => l.status === 'active').length;
+    const completedDeliveriesCount = orders.filter(o => o.status === 'delivered').length;
+
+    return {
+      totalFarmers,
+      totalBuyers,
+      totalDrivers,
+      totalTransactionsLkr,
+      activeListingsCount,
+      completedDeliveriesCount,
+      topCrops: mockPlatformStats.topCrops,
+      monthlyVolume: mockPlatformStats.monthlyVolume,
+    };
+  }, [users, orders, listings]);
 
   // Sync to localStorage
   useEffect(() => {
@@ -416,13 +517,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [cart]);
 
 
-
   useEffect(() => {
-    safeStorage.setItem(STORAGE_PREFIX + 'complaints', JSON.stringify(complaints));
-  }, [complaints]);
-
-  useEffect(() => {
-    safeStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
+    if (!isFirebaseConfigured) {
+      safeStorage.setItem(STORAGE_PREFIX + 'users', JSON.stringify(users));
+    } else {
+      safeStorage.removeItem(STORAGE_PREFIX + 'users');
+    }
   }, [users]);
 
   useEffect(() => {
@@ -450,7 +550,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (firebaseUser) {
           try {
             const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userSnap = await getDoc(userDocRef);
+            let userSnap = await getDoc(userDocRef);
+
+            if (!userSnap.exists() && firebaseUser.email?.toLowerCase() === 'isuru@gmail.com') {
+              try {
+                await setDoc(userDocRef, {
+                  _id: firebaseUser.uid,
+                  uid: firebaseUser.uid,
+                  name: firebaseUser.displayName || 'Isuru Admin',
+                  email: 'isuru@gmail.com',
+                  role: 'admin',
+                  verified: true,
+                  isDeactivated: false,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+                userSnap = await getDoc(userDocRef);
+              } catch (initErr) {
+                console.warn('Auto-provisioning admin doc on auth listener deferred:', initErr);
+              }
+            }
 
             if (userSnap.exists()) {
               const data = userSnap.data();
@@ -479,7 +598,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 rating: data.rating,
                 totalRatings: data.totalRatings,
               };
+
+              if (appUser.isDeactivated) {
+                await signOut(auth);
+                setCurrentUser(null);
+                return;
+              }
+
               setCurrentUser(appUser);
+              if (appUser.role === 'admin' && appUser.verified && !appUser.isDeactivated) {
+                setNavState(prev => ({
+                  ...prev,
+                  role: 'admin',
+                  activeTab: 'dashboard',
+                  subScreen: null,
+                }));
+              }
             }
           } catch (err) {
             console.warn('Error restoring user session from Firestore:', err);
@@ -495,6 +629,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => unsubscribe();
   }, []);
+
+  // ----------------------------------------------------
+  // Firestore Real-Time Users Listener (Real Accounts)
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isFirebaseConfigured || !isAuthReady) return;
+    if (!currentUser) {
+      setUsers([]);
+      return;
+    }
+
+    const usersQuery = collection(db, 'users');
+    const unsubscribe = onSnapshot(
+      usersQuery,
+      (snapshot) => {
+        const loadedUsers = snapshot.docs.map(mapFirestoreUser);
+        setUsers(loadedUsers);
+      },
+      (error) => {
+        console.warn('FIRESTORE USERS SNAPSHOT WARNING:', error.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser, isAuthReady]);
+
+  // ----------------------------------------------------
+  // Real-Time Session Security Listener (Blocks Deactivated Users)
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isFirebaseConfigured || !isAuthReady || !auth.currentUser) return;
+
+    const currentUid = auth.currentUser.uid;
+    const unsubscribe = onSnapshot(
+      doc(db, 'users', currentUid),
+      (snap) => {
+        if (snap.exists()) {
+          const uData = snap.data();
+          if (uData.isDeactivated) {
+            console.warn('Current user account has been deactivated by administrator. Terminating session.');
+            signOut(auth);
+            setCurrentUser(null);
+            setNavState({
+              role: 'buyer',
+              activeTab: 'home',
+              subScreen: 'auth',
+              selectedListingId: null,
+              selectedOrderId: null,
+              selectedConversationId: null,
+            });
+            return;
+          }
+          setCurrentUser(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              verified: Boolean(uData.verified),
+              isDeactivated: Boolean(uData.isDeactivated),
+            };
+          });
+        }
+      },
+      (error) => {
+        console.warn('FIRESTORE ACTIVE USER STATUS WARNING:', error.message);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser?.uid, isAuthReady]);
 
   // ----------------------------------------------------
   // Firestore Real-Time Listings Listener
@@ -591,7 +794,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const unsubscribe = onSnapshot(
         ordersQuery,
         (snapshot) => {
-          const loaded = snapshot.docs.map(mapFirestoreOrder);
+          const loaded = snapshot.docs.map(mapFirestoreOrder).sort(sortOrdersDesc);
           setOrders(loaded);
         },
         (error) => {
@@ -610,7 +813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const unsubscribe = onSnapshot(
         ordersQuery,
         (snapshot) => {
-          const loaded = snapshot.docs.map(mapFirestoreOrder);
+          const loaded = snapshot.docs.map(mapFirestoreOrder).sort(sortOrdersDesc);
           setOrders(loaded);
         },
         (error) => {
@@ -630,7 +833,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const unsubscribe = onSnapshot(
         ordersQuery,
         (snapshot) => {
-          const loaded = snapshot.docs.map(mapFirestoreOrder);
+          const loaded = snapshot.docs.map(mapFirestoreOrder).sort(sortOrdersDesc);
           setOrders(loaded);
         },
         (error) => {
@@ -658,7 +861,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const orderMap = new Map<string, Order>();
         availableOrders.forEach(o => orderMap.set(o._id, o));
         assignedOrders.forEach(o => orderMap.set(o._id, o));
-        setOrders(Array.from(orderMap.values()));
+        setOrders(Array.from(orderMap.values()).sort(sortOrdersDesc));
       };
 
       const availableQuery = query(
@@ -699,6 +902,99 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubAssigned();
       };
     }
+  }, [currentUser, isAuthReady]);
+
+  // ----------------------------------------------------
+  // Firestore Real-Time Support Tickets / Complaints Listener
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isFirebaseConfigured || !isAuthReady) return;
+    if (!currentUser || !auth.currentUser) {
+      setTickets([]);
+      return;
+    }
+
+    const currentRole = currentUser.role;
+    const currentUid = auth.currentUser.uid;
+
+    const mapFirestoreTicket = (docSnap: any): SupportTicket => {
+      const data = docSnap.data();
+      const statusVal = (data.status as TicketStatus) || 'open';
+      const createdStr = formatTimestamp(data.createdAt);
+      const updatedStr = formatOptionalTimestamp(data.updatedAt) || createdStr;
+      const lastMsgAtStr = formatOptionalTimestamp(data.lastMessageAt) || createdStr;
+
+      return {
+        _id: docSnap.id,
+        ticketId: docSnap.id,
+        ticketNumber: data.ticketNumber || `TCK-${docSnap.id.slice(-4).toUpperCase()}`,
+        buyerId: data.buyerId || '',
+        buyerName: data.buyerName || 'Buyer',
+        buyerPhone: data.buyerPhone || '',
+        buyerEmail: data.buyerEmail || '',
+        category: data.category || 'General',
+        subject: data.subject || data.reason || 'Support Request',
+        description: data.description || data.details || '',
+        reason: data.subject || data.reason || 'Support Request',
+        details: data.description || data.details || '',
+        complainantId: data.buyerId || '',
+        complainantName: data.buyerName || 'Buyer',
+        targetId: data.orderId || '',
+        targetName: data.orderId ? `Order #${data.orderId.slice(-6)}` : 'Platform Support',
+        targetType: 'order',
+        severity: (data.priority as any) || 'medium',
+        priority: data.priority || 'medium',
+        orderId: data.orderId || null,
+        orderNumber: data.orderNumber || (data.orderId ? `ORD-${data.orderId.slice(-4).toUpperCase()}` : null),
+        status: statusVal,
+        createdAt: createdStr,
+        updatedAt: updatedStr,
+        lastMessage: data.lastMessage || data.description || '',
+        lastMessageSenderRole: data.lastMessageSenderRole || 'buyer',
+        lastMessageAt: lastMsgAtStr,
+        resolutionNote: data.resolutionNote || null,
+      };
+    };
+
+    if (currentRole === 'admin') {
+      const ticketsQuery = collection(db, 'tickets');
+      const unsubscribe = onSnapshot(
+        ticketsQuery,
+        (snapshot) => {
+          const loaded = snapshot.docs.map(mapFirestoreTicket).sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+          setTickets(loaded);
+        },
+        (error) => {
+          console.warn('FIRESTORE ADMIN TICKETS SNAPSHOT WARNING:', error.message);
+        }
+      );
+      return () => unsubscribe();
+    }
+
+    if (currentRole === 'buyer') {
+      if (currentUser.isDeactivated) {
+        setTickets([]);
+        return;
+      }
+      const ticketsQuery = query(collection(db, 'tickets'), where('buyerId', '==', currentUid));
+      const unsubscribe = onSnapshot(
+        ticketsQuery,
+        (snapshot) => {
+          const loaded = snapshot.docs.map(mapFirestoreTicket).sort((a, b) => {
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+          setTickets(loaded);
+        },
+        (error) => {
+          console.warn('FIRESTORE BUYER TICKETS SNAPSHOT WARNING:', error.message);
+        }
+      );
+      return () => unsubscribe();
+    }
+
+    setTickets([]);
   }, [currentUser, isAuthReady]);
 
   // Actions
@@ -849,7 +1145,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Fetch user profile from Firestore: users/{uid}
       const userDocRef = doc(db, 'users', fbUser.uid);
-      const userSnap = await getDoc(userDocRef);
+      let userSnap = await getDoc(userDocRef);
+
+      if (!userSnap.exists() && fbUser.email?.toLowerCase() === 'isuru@gmail.com') {
+        try {
+          await setDoc(userDocRef, {
+            _id: fbUser.uid,
+            uid: fbUser.uid,
+            name: fbUser.displayName || 'Isuru Admin',
+            email: 'isuru@gmail.com',
+            role: 'admin',
+            verified: true,
+            isDeactivated: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          userSnap = await getDoc(userDocRef);
+        } catch (provisionErr) {
+          console.warn('Admin Firestore document initialization pending:', provisionErr);
+        }
+      }
 
       let loggedInUser: User;
       if (userSnap.exists()) {
@@ -890,6 +1205,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           verified: true,
           createdAt: new Date().toISOString(),
         };
+      }
+
+      // Check account activation
+      if (loggedInUser.isDeactivated) {
+        await signOut(auth);
+        throw new Error('Your account has been deactivated. Please contact support.');
+      }
+
+      // Check admin account verification
+      if (loggedInUser.role === 'admin') {
+        if (!loggedInUser.verified) {
+          await signOut(auth);
+          throw new Error('This admin account is not verified.');
+        }
       }
 
       setCurrentUser(loggedInUser);
@@ -1082,6 +1411,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedConversationId: null,
       selectedUserId: null,
       selectedComplaintId: null,
+      selectedTicketId: null,
     }));
   };
 
@@ -1093,6 +1423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       conversationId?: string;
       userId?: string;
       complaintId?: string;
+      ticketId?: string;
       initialRole?: Role;
       initialView?: 'login' | 'register';
     }
@@ -1107,7 +1438,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedOrderId: meta?.orderId ?? prev.selectedOrderId,
       selectedConversationId: meta?.conversationId ?? prev.selectedConversationId,
       selectedUserId: meta?.userId ?? prev.selectedUserId,
-      selectedComplaintId: meta?.complaintId ?? prev.selectedComplaintId,
+      selectedComplaintId: meta?.complaintId ?? meta?.ticketId ?? prev.selectedComplaintId,
+      selectedTicketId: meta?.ticketId ?? meta?.complaintId ?? prev.selectedTicketId,
       authRole: meta?.initialRole ?? prev.authRole,
       authView: meta?.initialView ?? prev.authView,
     }));
@@ -1122,6 +1454,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       selectedConversationId: null,
       selectedUserId: null,
       selectedComplaintId: null,
+      selectedTicketId: null,
     }));
   };
 
@@ -2206,6 +2539,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const adminVerifyUser = async (userId: string, approved: boolean) => {
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Unauthorized: Only administrators can modify verification status.');
+    }
     setUsers(prev =>
       prev.map(u => (u._id === userId ? { ...u, verified: approved } : u))
     );
@@ -2218,63 +2554,218 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           verified: approved,
           updatedAt: serverTimestamp(),
         });
-      } catch (err) {
-        console.warn('Error updating user verification in Firestore:', err);
+      } catch (err: any) {
+        console.warn('Error updating user verification in Firestore:', err.message);
+        throw err;
       }
     }
   };
 
-  const adminToggleDeactivateUser = (userId: string) => {
+  const adminToggleDeactivateUser = async (userId: string) => {
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Unauthorized: Only administrators can modify deactivation status.');
+    }
+    const target = users.find(u => u._id === userId);
+    const newDeactivatedState = target ? !target.isDeactivated : true;
+
     setUsers(prev =>
-      prev.map(u => (u._id === userId ? { ...u, isDeactivated: !u.isDeactivated } : u))
+      prev.map(u => (u._id === userId ? { ...u, isDeactivated: newDeactivatedState } : u))
+    );
+    if (currentUser?._id === userId || currentUser?.uid === userId) {
+      setCurrentUser(prev => prev ? { ...prev, isDeactivated: newDeactivatedState } : null);
+    }
+
+    if (isFirebaseConfigured) {
+      try {
+        await updateDoc(doc(db, 'users', userId), {
+          isDeactivated: newDeactivatedState,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (err: any) {
+        console.warn('Error toggling user deactivation in Firestore:', err.message);
+        throw err;
+      }
+    }
+  };
+
+  const raiseTicket = async (ticketData: {
+    category: string;
+    subject: string;
+    description: string;
+    orderId?: string | null;
+  }): Promise<SupportTicket> => {
+    if (!auth.currentUser) throw new Error('Must be authenticated to raise a ticket');
+    const currentUid = auth.currentUser.uid;
+    const ticketNumber = `TCK-${Math.floor(1000 + Math.random() * 9000)}`;
+    const nowIso = new Date().toISOString();
+
+    const newTicketData = {
+      ticketNumber,
+      buyerId: currentUid,
+      buyerName: currentUser?.name || 'Buyer',
+      buyerPhone: currentUser?.phone || '',
+      buyerEmail: currentUser?.email || '',
+      category: ticketData.category,
+      subject: ticketData.subject,
+      description: ticketData.description,
+      orderId: ticketData.orderId || null,
+      orderNumber: ticketData.orderId ? `ORD-${ticketData.orderId.slice(-4).toUpperCase()}` : null,
+      status: 'open',
+      priority: 'medium',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      lastMessage: ticketData.description,
+      lastSenderRole: 'buyer',
+      lastMessageSenderRole: 'buyer',
+      lastMessageAt: serverTimestamp(),
+    };
+
+    const docRef = await addDoc(collection(db, 'tickets'), newTicketData);
+
+    // Initial message stored in subcollection tickets/{ticketId}/messages/{messageId}
+    await addDoc(collection(db, 'tickets', docRef.id, 'messages'), {
+      senderId: currentUid,
+      senderRole: 'buyer',
+      senderName: currentUser?.name || 'Buyer',
+      message: ticketData.description,
+      createdAt: serverTimestamp(),
+    });
+
+    const created: SupportTicket = {
+      _id: docRef.id,
+      ticketId: docRef.id,
+      ticketNumber,
+      buyerId: currentUid,
+      buyerName: currentUser?.name || 'Buyer',
+      buyerPhone: currentUser?.phone || '',
+      buyerEmail: currentUser?.email || '',
+      category: ticketData.category,
+      subject: ticketData.subject,
+      description: ticketData.description,
+      reason: ticketData.subject,
+      details: ticketData.description,
+      complainantId: currentUid,
+      complainantName: currentUser?.name || 'Buyer',
+      targetId: ticketData.orderId || '',
+      targetName: ticketData.orderId ? `Order #${ticketData.orderId.slice(-6)}` : 'Platform Support',
+      targetType: 'order',
+      severity: 'medium',
+      orderId: ticketData.orderId || null,
+      orderNumber: ticketData.orderId ? `ORD-${ticketData.orderId.slice(-4).toUpperCase()}` : null,
+      status: 'open',
+      priority: 'medium',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      lastMessage: ticketData.description,
+      lastSenderRole: 'buyer',
+      lastMessageSenderRole: 'buyer',
+      lastMessageAt: nowIso,
+    };
+
+    setTickets(prev => [created, ...prev.filter(t => t._id !== docRef.id)]);
+    return created;
+  };
+
+  const sendTicketMessage = async (ticketId: string, messageText: string): Promise<void> => {
+    if (!auth.currentUser) throw new Error('Must be authenticated to send messages');
+    const currentUid = auth.currentUser.uid;
+    const role = currentUser?.role === 'admin' ? 'admin' : 'buyer';
+    const senderName = currentUser?.name || (role === 'admin' ? 'Support Desk' : 'Buyer');
+    const cleanMsg = messageText.trim();
+    if (!cleanMsg) return;
+
+    // 1. Add to tickets/{ticketId}/messages
+    await addDoc(collection(db, 'tickets', ticketId, 'messages'), {
+      senderId: currentUid,
+      senderRole: role,
+      senderName,
+      message: cleanMsg,
+      createdAt: serverTimestamp(),
+    });
+
+    // 2. Update parent ticket doc
+    const updateData: any = {
+      lastMessage: cleanMsg,
+      lastSenderRole: role,
+      lastMessageSenderRole: role,
+      lastMessageAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    if (role === 'admin') {
+      const existingTicket = tickets.find(t => t._id === ticketId);
+      if (existingTicket && existingTicket.status === 'open') {
+        updateData.status = 'in_progress';
+      }
+    }
+
+    await updateDoc(doc(db, 'tickets', ticketId), updateData);
+  };
+
+  const adminUpdateTicketStatus = async (
+    ticketId: string,
+    status: TicketStatus,
+    note?: string
+  ): Promise<void> => {
+    if (!auth.currentUser || currentUser?.role !== 'admin') {
+      throw new Error('Only administrators can update ticket status');
+    }
+    const updateData: any = {
+      status,
+      updatedAt: serverTimestamp(),
+    };
+    if (note !== undefined) {
+      updateData.resolutionNote = note;
+    }
+    await updateDoc(doc(db, 'tickets', ticketId), updateData);
+  };
+
+  const listenToTicketMessages = (
+    ticketId: string,
+    callback: (msgs: TicketMessage[]) => void
+  ): (() => void) => {
+    if (!ticketId || !isFirebaseConfigured) return () => {};
+    const q = collection(db, 'tickets', ticketId, 'messages');
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const msgs: TicketMessage[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            _id: docSnap.id,
+            senderId: data.senderId || '',
+            senderRole: (data.senderRole as Role) || 'buyer',
+            senderName: data.senderName || '',
+            message: data.message || '',
+            createdAt: formatTimestamp(data.createdAt),
+          };
+        }).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        callback(msgs);
+      },
+      (error) => {
+        console.warn('FIRESTORE TICKET MESSAGES SNAPSHOT WARNING:', error.message);
+      }
     );
   };
 
-  const adminResolveComplaint = (
+  const adminResolveComplaint = async (
     complaintId: string,
     action: 'resolved' | 'dismissed',
     note: string
   ) => {
-    setComplaints(prev =>
-      prev.map(c =>
-        c._id === complaintId
-          ? { ...c, status: action, resolutionNote: note }
-          : c
-      )
-    );
+    const nextStatus: TicketStatus = action === 'resolved' ? 'resolved' : 'closed';
+    await adminUpdateTicketStatus(complaintId, nextStatus, note);
   };
 
-  const adminWarnUser = (complaintId: string, note?: string) => {
-    setComplaints(prev =>
-      prev.map(c =>
-        c._id === complaintId
-          ? {
-              ...c,
-              status: 'resolved',
-              resolutionNote:
-                note ||
-                `Formal administrative warning issued to ${c.targetName}. Recorded in producer audit profile.`,
-            }
-          : c
-      )
-    );
+  const adminWarnUser = async (complaintId: string, note?: string) => {
+    const resolvedNote = note || 'Formal administrative warning issued. Recorded in audit file.';
+    await adminUpdateTicketStatus(complaintId, 'resolved', resolvedNote);
   };
 
-  const adminRemoveListingFromComplaint = (complaintId: string, listingId: string, reason?: string) => {
-    setListings(prev => prev.map(l => (l._id === listingId ? { ...l, status: 'removed' } : l)));
-    setComplaints(prev =>
-      prev.map(c =>
-        c._id === complaintId
-          ? {
-              ...c,
-              status: 'resolved',
-              resolutionNote:
-                reason ||
-                `Listing removed by platform administrator due to verified trade complaint.`,
-            }
-          : c
-      )
-    );
+  const adminRemoveListingFromComplaint = async (complaintId: string, listingId: string, reason?: string) => {
+    deleteListing(listingId);
+    const resolvedNote = reason || 'Listing removed by platform administrator due to trade complaint.';
+    await adminUpdateTicketStatus(complaintId, 'resolved', resolvedNote);
   };
 
   const updateCurrentUser = (userData: Partial<User>) => {
@@ -2285,14 +2776,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const fileComplaint = (complaintData: Omit<Complaint, '_id' | 'createdAt' | 'status'>): Complaint => {
-    const newComplaint: Complaint = {
-      _id: `complaint_${Date.now()}`,
-      status: 'pending',
+    const dummyId = `ticket_${Date.now()}`;
+    raiseTicket({
+      category: complaintData.category || 'General',
+      subject: complaintData.reason || complaintData.subject || 'Complaint',
+      description: complaintData.details || complaintData.description || '',
+      orderId: complaintData.orderId,
+    }).catch(err => console.error('fileComplaint error:', err));
+
+    return {
+      _id: dummyId,
+      status: 'open',
       createdAt: new Date().toISOString(),
       ...complaintData,
     };
-    setComplaints(prev => [newComplaint, ...prev]);
-    return newComplaint;
   };
 
   return (
@@ -2307,7 +2804,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         conversations,
         messages,
         marketPrices,
-        complaints,
+        complaints: tickets as any,
+        tickets,
         users,
         categories,
         platformStats,
@@ -2360,8 +2858,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adminResolveComplaint,
         adminWarnUser,
         adminRemoveListingFromComplaint,
+        adminUpdateTicketStatus,
         updateCurrentUser,
         fileComplaint,
+        raiseTicket,
+        sendTicketMessage,
+        listenToTicketMessages,
       }}
     >
       {children}

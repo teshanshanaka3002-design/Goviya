@@ -23,7 +23,16 @@ import {
   X,
   Navigation,
 } from 'lucide-react-native';
-import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured, mapFirestoreOrder } from '../../services/store';
+import {
+  useApp,
+  db,
+  doc,
+  onSnapshot,
+  auth,
+  isFirebaseConfigured,
+  mapFirestoreOrder,
+  sortOrdersDesc,
+} from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { isValidPhotoUrl } from '../../services/imageService';
 import { Button } from '../../components/ui/Button';
@@ -76,11 +85,13 @@ export const FarmerOrdersScreen: React.FC = () => {
   const currentFarmerId = currentUser?.role === 'farmer' ? currentUser._id : 'user_farmer_1';
   const currentFarmer = users.find(u => u._id === currentFarmerId) || currentUser;
 
-  // Filter orders by farm scope
-  const scopedOrders = orders.filter(o => {
-    if (viewScope === 'all_farms') return true;
-    return o.farmerId === currentFarmerId || (currentFarmer && o.farmerName === currentFarmer.name);
-  });
+  // Filter orders by farm scope and sort by createdAt descending (newest first, oldest last)
+  const scopedOrders = orders
+    .filter(o => {
+      if (viewScope === 'all_farms') return true;
+      return o.farmerId === currentFarmerId || (currentFarmer && o.farmerName === currentFarmer.name);
+    })
+    .sort(sortOrdersDesc);
 
   const pendingOrders = scopedOrders.filter(o => o.status === 'pending');
   const preparingOrders = scopedOrders.filter(o => o.status === 'accepted' || o.status === 'preparing');
@@ -88,25 +99,27 @@ export const FarmerOrdersScreen: React.FC = () => {
   const transitOrders = scopedOrders.filter(o => o.status === 'out_for_delivery');
   const deliveredOrders = scopedOrders.filter(o => o.status === 'delivered');
 
-  const filteredOrders = scopedOrders.filter(order => {
-    if (statusFilter === 'pending' && order.status !== 'pending') return false;
-    if (statusFilter === 'preparing' && order.status !== 'accepted' && order.status !== 'preparing') return false;
-    if (statusFilter === 'ready' && order.status !== 'ready_for_pickup') return false;
-    if (statusFilter === 'transit' && order.status !== 'out_for_delivery') return false;
-    if (statusFilter === 'delivered' && order.status !== 'delivered') return false;
+  const filteredOrders = scopedOrders
+    .filter(order => {
+      if (statusFilter === 'pending' && order.status !== 'pending') return false;
+      if (statusFilter === 'preparing' && order.status !== 'accepted' && order.status !== 'preparing') return false;
+      if (statusFilter === 'ready' && order.status !== 'ready_for_pickup') return false;
+      if (statusFilter === 'transit' && order.status !== 'out_for_delivery') return false;
+      if (statusFilter === 'delivered' && order.status !== 'delivered') return false;
 
-    if (deliveryTypeFilter === 'pickup' && order.deliveryType !== 'pickup') return false;
-    if (deliveryTypeFilter === 'delivery' && order.deliveryType === 'pickup') return false;
+      if (deliveryTypeFilter === 'pickup' && order.deliveryType !== 'pickup') return false;
+      if (deliveryTypeFilter === 'delivery' && order.deliveryType === 'pickup') return false;
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchOrderNum = order.orderNumber.toLowerCase().includes(q);
-      const matchBuyer = order.buyerName.toLowerCase().includes(q);
-      const matchCrop = order.items.some(i => i.cropName.toLowerCase().includes(q));
-      if (!matchOrderNum && !matchBuyer && !matchCrop) return false;
-    }
-    return true;
-  });
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchOrderNum = order.orderNumber.toLowerCase().includes(q);
+        const matchBuyer = order.buyerName.toLowerCase().includes(q);
+        const matchCrop = order.items.some(i => i.cropName.toLowerCase().includes(q));
+        if (!matchOrderNum && !matchBuyer && !matchCrop) return false;
+      }
+      return true;
+    })
+    .sort(sortOrdersDesc);
 
   return (
     <ScrollView className="flex-1 bg-[#F6F7F5] p-4" contentContainerStyle={{ paddingBottom: 50 }}>

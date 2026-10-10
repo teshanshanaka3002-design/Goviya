@@ -29,7 +29,7 @@ import {
   ImagePlus,
   Upload,
 } from 'lucide-react-native';
-import { useApp } from '../../services/store';
+import { useApp, sortOrdersDesc } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusPill } from '../../components/ui/StatusPill';
@@ -114,9 +114,11 @@ export const FarmerHomeScreen: React.FC = () => {
   const myListings = listings.filter(
     l => (l.farmerId === currentFarmerId || (currentUser?.uid && l.farmerId === currentUser.uid) || (currentUser?._id && l.farmerId === currentUser._id)) && l.status === 'active'
   );
-  const myOrders = orders.filter(
-    o => o.farmerId === currentFarmerId || (currentFarmer && o.farmerName === currentFarmer.name)
-  );
+  const myOrders = orders
+    .filter(
+      o => o.farmerId === currentFarmerId || (currentFarmer && o.farmerName === currentFarmer.name)
+    )
+    .sort(sortOrdersDesc);
 
   const pendingOrders = myOrders.filter(o => o.status === 'pending');
   const preparingOrders = myOrders.filter(o => o.status === 'accepted' || o.status === 'preparing');

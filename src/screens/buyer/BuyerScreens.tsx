@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -52,6 +53,7 @@ import {
   Flame,
   Percent,
   Compass,
+  LifeBuoy,
 } from 'lucide-react-native';
 import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured, mapFirestoreOrder } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
@@ -69,7 +71,7 @@ import { ProduceVisual } from '../../components/ui/ProduceVisual';
 import { Avatar } from '../../components/ui/Avatar';
 import { SellerProfileModal } from '../../components/shared/SellerProfileModal';
 import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
-import { Listing, Order, OrderStatus } from '../../types';
+import { Listing, Order, OrderStatus, SupportTicket, TicketMessage, TicketStatus } from '../../types';
 import { isValidPhotoUrl } from '../../services/imageService';
 
 // ===================== OFFER CARD COMPONENT =====================
@@ -3645,6 +3647,27 @@ export const BuyerProfileScreen: React.FC = () => {
               </View>
               <ChevronRight size={17} color="#94A3B8" />
             </Pressable>
+
+            <View style={s.profileDivider} />
+
+            {/* Help & Support */}
+            <Pressable
+              onPress={() => goToSubScreen('help_support')}
+              style={({ pressed }) => [s.profileMenuRow, pressed && s.btnPressed]}
+            >
+              <View style={s.profileMenuLeft}>
+                <View style={[s.profileMenuIconBox, { backgroundColor: '#F0FDF4' }]}>
+                  <LifeBuoy size={18} color="#15803D" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.profileMenuTitle}>Help & Support</Text>
+                  <Text style={s.profileMenuSubtitle}>
+                    Raise dispute tickets, order inquiries & live chat with support
+                  </Text>
+                </View>
+              </View>
+              <ChevronRight size={17} color="#94A3B8" />
+            </Pressable>
           </Card>
         </View>
 
@@ -3746,6 +3769,550 @@ export const BuyerProfileScreen: React.FC = () => {
   );
 };
 
+// ===================== 11. BUYER HELP & SUPPORT SCREEN =====================
+export const BuyerSupportScreen: React.FC = () => {
+  const { currentUser, tickets, orders, raiseTicket, goToSubScreen, goBack, openAuth } = useApp();
+  const [activeTab, setActiveTab] = useState<'all' | 'open' | 'resolved'>('all');
+  const [isRaiseModalOpen, setIsRaiseModalOpen] = useState(false);
+
+  // Form state
+  const [category, setCategory] = useState('Quality & Grading');
+  const [subject, setSubject] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const categories = [
+    'Quality & Grading',
+    'Delivery & Logistics',
+    'Damaged / Missing Crates',
+    'Payment & Pricing',
+    'General Inquiry',
+  ];
+
+  const currentUid = currentUser?._id || auth.currentUser?.uid;
+  const buyerTickets = tickets.filter(
+    t => !currentUid || t.buyerId === currentUid
+  );
+
+  const openTicketsCount = buyerTickets.filter(
+    t => t.status === 'open' || t.status === 'in_progress'
+  ).length;
+  const resolvedTicketsCount = buyerTickets.filter(
+    t => t.status === 'resolved' || t.status === 'closed'
+  ).length;
+
+  const filteredTickets = buyerTickets.filter(t => {
+    if (activeTab === 'open') return t.status === 'open' || t.status === 'in_progress';
+    if (activeTab === 'resolved') return t.status === 'resolved' || t.status === 'closed';
+    return true;
+  });
+
+  const handleOpenRaiseModal = () => {
+    if (!currentUser || !auth.currentUser) {
+      openAuth('buyer', 'login');
+      return;
+    }
+    setCategory('Quality & Grading');
+    setSubject('');
+    setDescription('');
+    setSelectedOrderId('');
+    setIsRaiseModalOpen(true);
+  };
+
+  const handleCreateTicket = async () => {
+    if (!subject.trim()) {
+      Alert.alert('Required', 'Please enter a ticket subject.');
+      return;
+    }
+    if (!description.trim()) {
+      Alert.alert('Required', 'Please describe the issue in detail.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const created = await raiseTicket({
+        category,
+        subject: subject.trim(),
+        description: description.trim(),
+        orderId: selectedOrderId ? selectedOrderId : null,
+      });
+      setIsRaiseModalOpen(false);
+      goToSubScreen('buyer_ticket_detail', { ticketId: created._id });
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to submit ticket');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F8FAF8' }}>
+      {/* Header */}
+      <View style={{ backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Pressable
+              onPress={goBack}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
+            >
+              <ArrowLeft size={18} color="#1A1A1A" />
+            </Pressable>
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: '#1A1A1A' }}>Help & Support</Text>
+              <Text style={{ fontSize: 11, color: '#6B7280' }}>Dispute tickets & support inquiries</Text>
+            </View>
+          </View>
+
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus size={14} color="#FFFFFF" />}
+            onPress={handleOpenRaiseModal}
+          >
+            Raise Ticket
+          </Button>
+        </View>
+
+        {/* Tab Filters */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          <Pressable
+            onPress={() => setActiveTab('all')}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 20,
+              borderWidth: 1,
+              backgroundColor: activeTab === 'all' ? '#1F5C3A' : '#FFFFFF',
+              borderColor: activeTab === 'all' ? '#1F5C3A' : '#E5E7EB',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'all' ? '#FFFFFF' : '#4B5563' }}>
+              All ({buyerTickets.length})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveTab('open')}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 20,
+              borderWidth: 1,
+              backgroundColor: activeTab === 'open' ? '#B45309' : '#FFFFFF',
+              borderColor: activeTab === 'open' ? '#B45309' : '#E5E7EB',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'open' ? '#FFFFFF' : '#4B5563' }}>
+              Active ({openTicketsCount})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setActiveTab('resolved')}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 5,
+              borderRadius: 20,
+              borderWidth: 1,
+              backgroundColor: activeTab === 'resolved' ? '#1F5C3A' : '#FFFFFF',
+              borderColor: activeTab === 'resolved' ? '#1F5C3A' : '#E5E7EB',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: activeTab === 'resolved' ? '#FFFFFF' : '#4B5563' }}>
+              Resolved ({resolvedTicketsCount})
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Ticket List */}
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60, gap: 12 }}>
+        {filteredTickets.length === 0 ? (
+          <EmptyState
+            title="No Support Tickets"
+            description="Have an inquiry or issue with an order? Raise a ticket to chat directly with support."
+            actionLabel="Raise Ticket Now"
+            onAction={handleOpenRaiseModal}
+          />
+        ) : (
+          filteredTickets.map(ticket => {
+            const ticketNo = ticket.ticketNumber || `TCK-${ticket._id.slice(-4).toUpperCase()}`;
+
+            return (
+              <Pressable
+                key={ticket._id}
+                onPress={() => goToSubScreen('buyer_ticket_detail', { ticketId: ticket._id })}
+              >
+                <Card padding="md" style={{ gap: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#F0F0EE', paddingBottom: 6 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{ backgroundColor: '#E6F2E8', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#CDE5D2' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#1F5C3A' }}>{ticketNo}</Text>
+                      </View>
+                      <View style={{ backgroundColor: '#F3F4F6', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#E5E7EB' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#4B5563' }}>{ticket.category}</Text>
+                      </View>
+                    </View>
+                    <StatusPill status={ticket.status} />
+                  </View>
+
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1A1A1A' }}>
+                    {ticket.subject}
+                  </Text>
+
+                  {ticket.orderId ? (
+                    <Text style={{ fontSize: 11, color: '#1F5C3A', fontWeight: '600' }}>
+                      Linked to Order #{ticket.orderId.slice(-6)}
+                    </Text>
+                  ) : null}
+
+                  <Text style={{ fontSize: 12, color: '#4B5563', lineHeight: 16 }} numberOfLines={2}>
+                    {ticket.lastMessage || ticket.description}
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F0F0EE' }}>
+                    <Text style={{ fontSize: 10, color: '#9CA3AF' }}>
+                      {new Date(ticket.updatedAt || ticket.createdAt).toLocaleDateString()}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#1F5C3A' }}>
+                        View Conversation
+                      </Text>
+                      <ChevronRight size={13} color="#1F5C3A" />
+                    </View>
+                  </View>
+                </Card>
+              </Pressable>
+            );
+          })
+        )}
+      </ScrollView>
+
+      {/* Raise Ticket BottomSheet */}
+      <BottomSheet
+        isOpen={isRaiseModalOpen}
+        onClose={() => setIsRaiseModalOpen(false)}
+        title="Raise Support Ticket"
+      >
+        <ScrollView style={{ maxHeight: 460 }} contentContainerStyle={{ gap: 14, paddingBottom: 20 }}>
+          {/* Category Picker */}
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1A1A1A' }}>Ticket Category</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {categories.map(cat => (
+                <Pressable
+                  key={cat}
+                  onPress={() => setCategory(cat)}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    backgroundColor: category === cat ? '#E6F2E8' : '#F9FAFB',
+                    borderColor: category === cat ? '#1F5C3A' : '#E5E7EB',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: category === cat ? '700' : '500', color: category === cat ? '#1F5C3A' : '#4B5563' }}>
+                    {cat}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Subject */}
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1A1A1A' }}>Subject</Text>
+            <TextInput
+              style={{ backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: '#1A1A1A' }}
+              placeholder="e.g. Cabbage crates delayed by 3 hours"
+              placeholderTextColor="#9CA3AF"
+              value={subject}
+              onChangeText={setSubject}
+            />
+          </View>
+
+          {/* Optional Order ID */}
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1A1A1A' }}>
+              Related Order ID (Optional)
+            </Text>
+            {orders.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                <Pressable
+                  onPress={() => setSelectedOrderId('')}
+                  style={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    backgroundColor: selectedOrderId === '' ? '#E6F2E8' : '#F9FAFB',
+                    borderColor: selectedOrderId === '' ? '#1F5C3A' : '#E5E7EB',
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: selectedOrderId === '' ? '#1F5C3A' : '#4B5563' }}>None</Text>
+                </Pressable>
+                {orders.slice(0, 5).map(o => (
+                  <Pressable
+                    key={o._id}
+                    onPress={() => setSelectedOrderId(o._id)}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      backgroundColor: selectedOrderId === o._id ? '#E6F2E8' : '#F9FAFB',
+                      borderColor: selectedOrderId === o._id ? '#1F5C3A' : '#E5E7EB',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: selectedOrderId === o._id ? '#1F5C3A' : '#4B5563' }}>
+                      #{o._id.slice(-6)} ({o.items[0]?.cropName || 'Produce'})
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <TextInput
+                style={{ backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: '#1A1A1A' }}
+                placeholder="Enter Order ID if applicable"
+                placeholderTextColor="#9CA3AF"
+                value={selectedOrderId}
+                onChangeText={setSelectedOrderId}
+              />
+            )}
+          </View>
+
+          {/* Description */}
+          <View style={{ gap: 4 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#1A1A1A' }}>Description</Text>
+            <TextInput
+              style={{ backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12, color: '#1A1A1A', height: 90, textAlignVertical: 'top' }}
+              placeholder="Provide complete details about the issue..."
+              placeholderTextColor="#9CA3AF"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+            />
+          </View>
+
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            isLoading={submitting}
+            onPress={handleCreateTicket}
+          >
+            Submit Ticket
+          </Button>
+        </ScrollView>
+      </BottomSheet>
+    </View>
+  );
+};
+
+// ===================== 12. BUYER TICKET DETAIL & CHAT SCREEN =====================
+export const BuyerTicketDetailScreen: React.FC = () => {
+  const { navState, tickets, sendTicketMessage, listenToTicketMessages, goBack, goToSubScreen } = useApp();
+  const ticketId = navState.selectedTicketId || navState.selectedComplaintId;
+  const ticket = tickets.find(t => t._id === ticketId) || tickets[0];
+
+  const [messages, setMessages] = useState<TicketMessage[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (!ticket?._id) return;
+    const unsubscribe = listenToTicketMessages(ticket._id, (liveMsgs) => {
+      setMessages(liveMsgs);
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+    return () => unsubscribe();
+  }, [ticket?._id]);
+
+  if (!ticket) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F8FAF8', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A1A1A' }}>Ticket not found</Text>
+        <Button variant="primary" size="sm" onPress={goBack} style={{ marginTop: 12 }}>
+          Back to Support
+        </Button>
+      </View>
+    );
+  }
+
+  const ticketNo = ticket.ticketNumber || `TCK-${ticket._id.slice(-4).toUpperCase()}`;
+
+  const handleSendReply = async () => {
+    const text = replyText.trim();
+    if (!text || sending) return;
+
+    setSending(true);
+    try {
+      await sendTicketMessage(ticket._id, text);
+      setReplyText('');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#F8FAF8' }}>
+      {/* Top Header */}
+      <View style={{ backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <Pressable
+          onPress={() => goToSubScreen('help_support')}
+          style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
+        >
+          <ArrowLeft size={18} color="#1A1A1A" />
+        </Pressable>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#1A1A1A' }}>{ticketNo}</Text>
+            <StatusPill status={ticket.status} />
+          </View>
+          <Text style={{ fontSize: 11, color: '#6B7280' }} numberOfLines={1}>
+            {ticket.subject}
+          </Text>
+        </View>
+      </View>
+
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 30, gap: 12 }}
+      >
+        {/* Ticket Details Card */}
+        <Card padding="md" style={{ gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: '#F0F0EE', paddingBottom: 6 }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1F5C3A' }}>
+              Category: {ticket.category}
+            </Text>
+            <Text style={{ fontSize: 10, color: '#9CA3AF' }}>
+              {new Date(ticket.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+
+          <Text style={{ fontSize: 13, fontWeight: '800', color: '#1A1A1A' }}>
+            {ticket.subject}
+          </Text>
+
+          {ticket.orderId ? (
+            <Text style={{ fontSize: 11, fontWeight: '600', color: '#1F5C3A' }}>
+              Related Order: #{ticket.orderId.slice(-6)}
+            </Text>
+          ) : null}
+
+          <Text style={{ fontSize: 12, color: '#4B5563', lineHeight: 18 }}>
+            {ticket.description}
+          </Text>
+
+          {Boolean(ticket.resolutionNote) && (
+            <View style={{ backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', padding: 10, borderRadius: 8, gap: 4, marginTop: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={13} color="#059669" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#065F46' }}>Resolution Note</Text>
+              </View>
+              <Text style={{ fontSize: 11, color: '#065F46' }}>{ticket.resolutionNote}</Text>
+            </View>
+          )}
+        </Card>
+
+        {/* Live Conversation Thread */}
+        <View style={{ gap: 8, marginTop: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2 }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1A1A1A', textTransform: 'uppercase' }}>
+              Support Conversation ({messages.length})
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#1F5C3A' }} />
+              <Text style={{ fontSize: 10, color: '#1F5C3A', fontWeight: '700' }}>Live Updates</Text>
+            </View>
+          </View>
+
+          {messages.length === 0 ? (
+            <Card padding="md" style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <MessageSquare size={22} color="#9CA3AF" />
+              <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 4, fontWeight: '600' }}>
+                No messages yet
+              </Text>
+            </Card>
+          ) : (
+            <View style={{ gap: 8 }}>
+              {messages.map(msg => {
+                const isAdmin = msg.senderRole === 'admin';
+                return (
+                  <View
+                    key={msg._id}
+                    style={{
+                      maxWidth: '85%',
+                      padding: 10,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      alignSelf: isAdmin ? 'flex-start' : 'flex-end',
+                      backgroundColor: isAdmin ? '#F3F4F6' : '#1F5C3A',
+                      borderColor: isAdmin ? '#E5E7EB' : '#1F5C3A',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: isAdmin ? '#1F5C3A' : '#A7F3D0' }}>
+                        {isAdmin ? 'Platform Support' : 'You'}
+                      </Text>
+                      <Text style={{ fontSize: 9, color: isAdmin ? '#9CA3AF' : 'rgba(255,255,255,0.7)' }}>
+                        {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: isAdmin ? '#1A1A1A' : '#FFFFFF', lineHeight: 17 }}>
+                      {msg.message}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Reply Input Bar */}
+      <View style={{ backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <TextInput
+          style={{ flex: 1, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, fontSize: 12, color: '#1A1A1A' }}
+          placeholder="Reply to support..."
+          placeholderTextColor="#9CA3AF"
+          value={replyText}
+          onChangeText={setReplyText}
+          onSubmitEditing={handleSendReply}
+        />
+        <Pressable
+          onPress={handleSendReply}
+          disabled={!replyText.trim() || sending}
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 19,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: replyText.trim() && !sending ? '#1F5C3A' : '#E5E7EB',
+          }}
+        >
+          {sending ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Send size={15} color={replyText.trim() ? '#FFFFFF' : '#9CA3AF'} />
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
+};
+
 // ===================== MAIN BUYER SCREEN ROUTER =====================
 export const BuyerScreens: React.FC = () => {
   const { navState } = useApp();
@@ -3768,6 +4335,10 @@ export const BuyerScreens: React.FC = () => {
       return <BuyerChatScreen />;
     case 'market_prices':
       return <MarketPricesScreen />;
+    case 'help_support':
+      return <BuyerSupportScreen />;
+    case 'buyer_ticket_detail':
+      return <BuyerTicketDetailScreen />;
     default:
       break;
   }

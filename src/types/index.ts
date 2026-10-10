@@ -214,20 +214,77 @@ export interface MarketPriceRecord {
   history6Months: { month: string; price: number }[];
 }
 
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
+export interface TicketMessage {
+  _id: string;
+  senderId: string;
+  senderRole: Role;
+  senderName: string;
+  message: string;
+  createdAt: any;
+}
+
+export interface SupportTicket {
+  _id: string;
+  ticketId?: string;
+  ticketNumber?: string;
+  buyerId: string;
+  buyerName: string;
+  buyerPhone?: string;
+  buyerEmail?: string;
+  category: string;
+  subject: string;
+  description: string;
+  reason?: string;
+  details?: string;
+  complainantId?: string;
+  complainantName?: string;
+  targetId?: string;
+  targetName?: string;
+  targetType?: string;
+  orderId?: string | null;
+  orderNumber?: string | null;
+  status: TicketStatus;
+  priority?: 'low' | 'medium' | 'high';
+  severity?: 'low' | 'medium' | 'high';
+  createdAt: any;
+  updatedAt: any;
+  lastMessage?: string;
+  lastSenderRole?: Role;
+  lastMessageSenderRole?: Role;
+  lastMessageAt?: any;
+  resolutionNote?: string | null;
+}
+
 export interface Complaint {
   _id: string;
-  complainantId: string;
-  complainantName: string;
-  targetId: string;
-  targetName: string;
-  targetType: 'listing' | 'farmer' | 'buyer' | 'driver';
-  reason: string;
-  details: string;
-  severity: 'low' | 'medium' | 'high';
-  status: 'pending' | 'resolved' | 'dismissed';
+  ticketNumber?: string;
+  buyerId?: string;
+  buyerName?: string;
+  buyerPhone?: string;
+  buyerEmail?: string;
+  complainantId?: string;
+  complainantName?: string;
+  targetId?: string;
+  targetName?: string;
+  targetType?: 'listing' | 'farmer' | 'buyer' | 'driver' | 'order' | 'platform';
+  category?: string;
+  subject?: string;
+  reason?: string;
+  description?: string;
+  details?: string;
+  orderId?: string | null;
+  severity?: 'low' | 'medium' | 'high';
+  priority?: 'low' | 'medium' | 'high';
+  status: TicketStatus | 'pending' | 'resolved' | 'dismissed';
   evidencePhotos?: string[];
-  createdAt: string;
-  resolutionNote?: string;
+  createdAt: any;
+  updatedAt?: any;
+  lastMessage?: string;
+  lastMessageSenderRole?: Role;
+  lastMessageAt?: any;
+  resolutionNote?: string | null;
 }
 
 export interface PlatformStat {

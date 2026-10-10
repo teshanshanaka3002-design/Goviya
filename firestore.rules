@@ -48,9 +48,15 @@ service cloud.firestore {
         && request.auth.uid == userId
         && request.resource.data.uid == request.auth.uid
         && request.resource.data._id == request.auth.uid
-        && request.resource.data.role in ['buyer', 'farmer', 'driver']
         && request.resource.data.isDeactivated == false
         && (
+          (
+            request.resource.data.role == 'admin'
+            && (request.auth.token.email == 'isuru@gmail.com' || request.auth.uid == 'l4lrdMR5YDWo30wrZfzAlpRYgEC3')
+            && request.resource.data.email == 'isuru@gmail.com'
+            && request.resource.data.verified == true
+          )
+          ||
           (
             request.resource.data.role == 'buyer'
             && request.resource.data.verified == true
@@ -326,6 +332,84 @@ service cloud.firestore {
         || isDriverOrderUpdate();
 
       allow delete: if isAdmin();
+    }
+
+    match /tickets/{ticketId} {
+      function isBuyerTicketOwner() {
+        return isBuyer() && resource.data.buyerId == request.auth.uid;
+      }
+
+      function isBuyerTicketChatUpdate() {
+        // Buyer can ONLY update parent ticket fields needed for chat updates
+        let isOwner = isBuyerTicketOwner();
+        let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
+          && request.resource.data.status == resource.data.status
+          && (!('priority' in resource.data) || request.resource.data.priority == resource.data.priority);
+        let allowedChatKeysOnly = request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'updatedAt',
+          'lastMessage',
+          'lastSenderRole',
+          'lastMessageSenderRole',
+          'lastMessageAt'
+        ]);
+        return isOwner && unchangedCore && allowedChatKeysOnly;
+      }
+
+      function isAdminTicketUpdate() {
+        return isAdmin()
+          && request.resource.data.status in ['open', 'in_progress', 'resolved', 'closed'];
+      }
+
+      // 2. Buyer can read only their own tickets; Admin can read all tickets
+      allow read: if isAdmin()
+        || isBuyerTicketOwner();
+
+      // 1. Buyer can create a ticket only when:
+      // - buyerId == request.auth.uid
+      // - status == 'open'
+      allow create: if isAdmin()
+        || (
+          isBuyer()
+          && request.resource.data.buyerId == request.auth.uid
+          && request.resource.data.status == 'open'
+        );
+
+      // 3. Buyer must NOT be able to change status, buyerId, priority, admin fields.
+      //    When Buyer sends a message, only allow parent ticket fields needed for chat updates.
+      // 6. Only Admin can change ticket status (open, in_progress, resolved, closed).
+      allow update: if isAdminTicketUpdate()
+        || isBuyerTicketChatUpdate();
+
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        // Real-time messages read: Buyer reads messages for own ticket, Admin reads all
+        allow read: if isAdmin()
+          || (
+            isBuyer()
+            && get(/databases/$(database)/documents/tickets/$(ticketId)).data.buyerId == request.auth.uid
+          );
+
+        // 4. Buyer message creation must require:
+        // - senderId == request.auth.uid
+        // - senderRole == 'buyer'
+        // 5. Admin message creation must require:
+        // - senderRole == 'admin'
+        allow create: if (
+            isAdmin()
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.senderRole == 'admin'
+          )
+          || (
+            isBuyer()
+            && get(/databases/$(database)/documents/tickets/$(ticketId)).data.buyerId == request.auth.uid
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.senderRole == 'buyer'
+          );
+
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
     }
   }
 }
