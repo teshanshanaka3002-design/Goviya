@@ -139,6 +139,7 @@ export interface Order {
   };
   pickupPin?: string;
   preparationNote?: string;
+  pickedUpAt?: string;
   deliveredAt?: string;
   deliveredBy?: string;
   deliveryProofNote?: string;

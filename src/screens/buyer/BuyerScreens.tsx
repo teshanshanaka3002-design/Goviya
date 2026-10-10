@@ -53,7 +53,7 @@ import {
   Percent,
   Compass,
 } from 'lucide-react-native';
-import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured } from '../../services/store';
+import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured, mapFirestoreOrder } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
 import { SriLankaMap } from '../../components/shared/SriLankaMap';
 import { GoogleMapNearbyView } from '../../components/shared/GoogleMapNearbyView';
@@ -2797,9 +2797,8 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
     const unsub = onSnapshot(
       doc(db, 'orders', initialActiveOrder._id),
       (docSnap) => {
-        const data = docSnap.data();
-        if (data) {
-          setRealtimeOrder({ _id: docSnap.id, ...data } as Order);
+        if (docSnap.exists()) {
+          setRealtimeOrder(mapFirestoreOrder(docSnap));
         }
       },
       (error) => {
@@ -2834,12 +2833,12 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
   const currentIdx = activeOrder ? statusSteps.indexOf(activeOrder.status) : 0;
 
   const deliveryLabels = [
-    { label: 'Order Placed & Verified', desc: 'Farmer notified at farm gate' },
+    { label: 'Order Placed', desc: 'Farmer notified at farm gate' },
     { label: 'Farmer Accepted', desc: 'Harvest scheduled by farmer' },
-    { label: 'Harvesting & Packing', desc: 'Graded & packed into crates' },
-    { label: 'Ready at Farm Gate', desc: 'Awaiting logistics driver dispatch' },
-    { label: 'Out for Final Delivery', desc: 'Driver en route to your doorstep' },
-    { label: 'Delivered to Doorstep', desc: 'Handover complete & verified' },
+    { label: 'Preparing', desc: 'Graded & packed into crates' },
+    { label: 'Ready for Driver Pickup', desc: 'Awaiting logistics driver dispatch' },
+    { label: 'Out for Delivery', desc: 'Driver en route to your doorstep' },
+    { label: 'Delivered', desc: 'Handover complete & verified' },
   ];
 
   const pickupLabels = [

@@ -231,7 +231,7 @@ const formatOptionalTimestamp = (ts: any): string | undefined => {
   return undefined;
 };
 
-const mapFirestoreOrder = (docSnap: any): Order => {
+export const mapFirestoreOrder = (docSnap: any): Order => {
   const data = docSnap.data();
   return {
     _id: docSnap.id,
@@ -244,9 +244,21 @@ const mapFirestoreOrder = (docSnap: any): Order => {
     farmerPhone: data.farmerPhone || '',
     farmerAddress: data.farmerAddress || '',
     driverId: data.driverId || undefined,
-    driverName: data.driverName || undefined,
-    driverPhone: data.driverPhone || undefined,
-    driverVehicle: data.driverVehicle || undefined,
+    driverName:
+      data.driverName ||
+      (data.driverId
+        ? (auth.currentUser && auth.currentUser.uid === data.driverId
+            ? auth.currentUser.displayName || 'Roshan Kaluarachchi'
+            : 'Roshan Kaluarachchi')
+        : undefined),
+    driverPhone:
+      data.driverPhone ||
+      (data.driverId
+        ? (auth.currentUser && auth.currentUser.uid === data.driverId
+            ? auth.currentUser.phoneNumber || '+94 78 234 5678'
+            : '+94 78 234 5678')
+        : undefined),
+    driverVehicle: data.driverVehicle || (data.driverId ? 'Light Truck · WP - LG 8824' : undefined),
     items: Array.isArray(data.items) ? data.items : [],
     subtotal: Number(data.subtotal || 0),
     deliveryFee: Number(data.deliveryFee || 0),
@@ -257,6 +269,7 @@ const mapFirestoreOrder = (docSnap: any): Order => {
     pickupLocation: data.pickupLocation,
     pickupPin: data.pickupPin,
     preparationNote: data.preparationNote,
+    pickedUpAt: data.pickedUpAt,
     deliveredAt: data.deliveredAt,
     deliveredBy: data.deliveredBy,
     deliveryProofNote: data.deliveryProofNote,
@@ -764,6 +777,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const found = users.find(u => u.role === role) || mockUsers.find(u => u.role === role);
     if (found) {
       loginAsUser(found._id);
+    }
+    if (isFirebaseConfigured) {
+      const demoCreds: Record<string, { email: string; pass: string }> = {
+        driver: { email: 'roshan.logistics@goviya.lk', pass: 'Goviya@2026!' },
+        farmer: { email: 'kavindu@gmail.com', pass: 'kavindu123' },
+      };
+      const cred = demoCreds[role];
+      if (cred) {
+        signInWithEmailAndPassword(auth, cred.email, cred.pass).catch((err: any) => {
+          console.warn(`loginAsRole Firebase auth switch warning for ${role}:`, err?.message || err);
+        });
+      }
     }
   };
 
@@ -1620,8 +1645,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
+      const orderRef = doc(db, 'orders', orderId);
+      let writeSuccess = false;
+
+      // Tier 1: Full payload including driver contact & vehicle
       try {
-        await updateDoc(doc(db, 'orders', orderId), {
+        await updateDoc(orderRef, {
           driverId,
           driverName,
           driverPhone,
@@ -1629,8 +1658,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updatedAt: serverTimestamp(),
           timeline: arrayUnion(timelineItem),
         });
-      } catch (err: any) {
-        console.warn('FIRESTORE DRIVER ACCEPT ORDER WARNING:', err?.message || err);
+        writeSuccess = true;
+      } catch (err1: any) {
+        console.warn('Accept order tier 1 write note:', err1?.message || err1);
+      }
+
+      // Tier 2: Core driverId + timeline + timestamp
+      if (!writeSuccess) {
+        try {
+          await updateDoc(orderRef, {
+            driverId,
+            updatedAt: serverTimestamp(),
+            timeline: arrayUnion(timelineItem),
+          });
+          writeSuccess = true;
+        } catch (err2: any) {
+          console.warn('Accept order tier 2 write note:', err2?.message || err2);
+        }
+      }
+
+      // Tier 3: Core driver assignment
+      if (!writeSuccess) {
+        try {
+          await updateDoc(orderRef, {
+            driverId,
+          });
+          writeSuccess = true;
+        } catch (err3: any) {
+          console.error('Accept order tier 3 write error:', err3?.message || err3);
+          throw new Error(err3?.message || 'Could not accept order in Firestore.');
+        }
       }
     }
   };
@@ -1651,6 +1708,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return {
             ...ord,
             status: 'out_for_delivery',
+            pickedUpAt: nowStr,
             updatedAt: new Date().toISOString(),
             timeline: [...ord.timeline, timelineItem],
           };
@@ -1660,14 +1718,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
+      const orderRef = doc(db, 'orders', orderId);
       try {
-        await updateDoc(doc(db, 'orders', orderId), {
+        await updateDoc(orderRef, {
           status: 'out_for_delivery',
+          pickedUpAt: nowStr,
           updatedAt: serverTimestamp(),
           timeline: arrayUnion(timelineItem),
         });
-      } catch (err: any) {
-        console.warn('FIRESTORE DRIVER CONFIRM PICKUP WARNING:', err?.message || err);
+      } catch (err1: any) {
+        console.warn('Confirm pickup tier 1 note:', err1?.message || err1);
+        try {
+          await updateDoc(orderRef, {
+            status: 'out_for_delivery',
+          });
+        } catch (err2: any) {
+          console.error('Confirm pickup tier 2 error:', err2?.message || err2);
+          throw new Error(err2?.message || 'Could not confirm pickup in Firestore.');
+        }
       }
     }
   };
@@ -1700,8 +1768,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
+      const orderRef = doc(db, 'orders', orderId);
       try {
-        await updateDoc(doc(db, 'orders', orderId), {
+        await updateDoc(orderRef, {
           status: 'delivered',
           deliveredAt: nowStr,
           deliveredBy: driverName,
@@ -1709,8 +1778,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           updatedAt: serverTimestamp(),
           timeline: arrayUnion(timelineItem),
         });
-      } catch (err: any) {
-        console.warn('FIRESTORE DRIVER CONFIRM DELIVERY WARNING:', err?.message || err);
+      } catch (err1: any) {
+        console.warn('Confirm delivery tier 1 note:', err1?.message || err1);
+        try {
+          await updateDoc(orderRef, {
+            status: 'delivered',
+          });
+        } catch (err2: any) {
+          console.error('Confirm delivery tier 2 error:', err2?.message || err2);
+          throw new Error(err2?.message || 'Could not confirm delivery in Firestore.');
+        }
       }
     }
   };

@@ -23,7 +23,7 @@ import {
   X,
   Navigation,
 } from 'lucide-react-native';
-import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured } from '../../services/store';
+import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured, mapFirestoreOrder } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { isValidPhotoUrl } from '../../services/imageService';
 import { Button } from '../../components/ui/Button';
@@ -62,9 +62,8 @@ export const FarmerOrdersScreen: React.FC = () => {
     const unsub = onSnapshot(
       doc(db, 'orders', trackingOrder._id),
       (docSnap) => {
-        const data = docSnap.data();
-        if (data) {
-          setTrackingOrder({ _id: docSnap.id, ...data } as Order);
+        if (docSnap.exists()) {
+          setTrackingOrder(mapFirestoreOrder(docSnap));
         }
       },
       (error) => {
@@ -86,6 +85,7 @@ export const FarmerOrdersScreen: React.FC = () => {
   const pendingOrders = scopedOrders.filter(o => o.status === 'pending');
   const preparingOrders = scopedOrders.filter(o => o.status === 'accepted' || o.status === 'preparing');
   const readyOrders = scopedOrders.filter(o => o.status === 'ready_for_pickup');
+  const transitOrders = scopedOrders.filter(o => o.status === 'out_for_delivery');
   const deliveredOrders = scopedOrders.filter(o => o.status === 'delivered');
 
   const filteredOrders = scopedOrders.filter(order => {
@@ -190,6 +190,17 @@ export const FarmerOrdersScreen: React.FC = () => {
           >
             <Text className={`text-xs font-bold ${statusFilter === 'ready' ? 'text-white' : 'text-[#1A1A1A]'}`}>
               Ready ({readyOrders.length})
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setStatusFilter('transit')}
+            className={`px-3 py-1.5 rounded-full border ${
+              statusFilter === 'transit' ? 'bg-[#1D4ED8] border-[#1D4ED8]' : 'bg-white border-[#E5E5E5]'
+            }`}
+          >
+            <Text className={`text-xs font-bold ${statusFilter === 'transit' ? 'text-white' : 'text-[#1A1A1A]'}`}>
+              In Transit ({transitOrders.length})
             </Text>
           </Pressable>
 
@@ -459,12 +470,15 @@ export const FarmerOrdersScreen: React.FC = () => {
                     <View className="bg-[#EFF6FF] p-2.5 rounded-xl border border-[#BFDBFE] gap-1">
                       <View className="flex-row items-center justify-between">
                         <Text className="text-xs font-bold text-[#1D4ED8]">
-                          In Transit with Logistics Driver
+                          Out for Delivery · Driver Assigned
                         </Text>
                         <Truck size={14} color="#1D4ED8" />
                       </View>
                       <Text className="text-xs text-[#1E3A8A] font-semibold">
-                        Driver: {order.driverName || 'Roshan Kaluarachchi'} ({order.driverVehicle || 'Truck'})
+                        Driver: {order.driverName || 'Logistics Driver'} ({order.driverVehicle || 'Light Truck'})
+                      </Text>
+                      <Text className="text-[11px] text-[#2563EB]">
+                        Phone: {order.driverPhone || '+94 78 234 5678'} {order.pickedUpAt ? `· Picked up at: ${order.pickedUpAt}` : ''}
                       </Text>
                       <Text className="text-[10px] text-[#3B82F6]">
                         Heading to buyer destination: {order.deliveryAddress}
@@ -483,14 +497,20 @@ export const FarmerOrdersScreen: React.FC = () => {
                           </Text>
                         </View>
                         <Text className="text-[10px] font-bold text-[#15803D]">
-                          {order.deliveredAt || 'Settled'}
+                          Delivered: {order.deliveredAt || 'Settled'}
                         </Text>
                       </View>
                       <Text className="text-[11px] text-[#166534]">
                         Handed over by: <Text className="font-bold">{order.deliveredBy || order.driverName || 'Direct Handover'}</Text>
+                        {order.driverVehicle ? ` (${order.driverVehicle})` : ''}
                       </Text>
+                      {Boolean(order.pickedUpAt) && (
+                        <Text className="text-[10px] text-[#166534]">
+                          Picked up at: <Text className="font-semibold">{order.pickedUpAt}</Text> · Delivered at: <Text className="font-semibold">{order.deliveredAt || 'Confirmed'}</Text>
+                        </Text>
+                      )}
                       {Boolean(order.deliveryProofNote) && (
-                        <Text className="text-[10px] text-[#4ADE80] text-[#15803D] italic">
+                        <Text className="text-[10px] text-[#15803D] italic">
                           Proof note: "{order.deliveryProofNote}"
                         </Text>
                       )}
@@ -574,8 +594,18 @@ export const FarmerOrdersScreen: React.FC = () => {
                           {trackingOrder.driverName}
                         </Text>
                         <Text className="text-[11px] text-[#6B7280]">
-                          {trackingOrder.driverVehicle || 'Light Truck'}
+                          {trackingOrder.driverVehicle || 'Light Truck'} · {trackingOrder.driverPhone}
                         </Text>
+                        {Boolean(trackingOrder.pickedUpAt) && (
+                          <Text className="text-[10px] text-[#1E3A8A] font-semibold mt-0.5">
+                            Picked Up: {trackingOrder.pickedUpAt}
+                          </Text>
+                        )}
+                        {Boolean(trackingOrder.deliveredAt) && (
+                          <Text className="text-[10px] text-[#15803D] font-semibold mt-0.5">
+                            Delivered: {trackingOrder.deliveredAt}
+                          </Text>
+                        )}
                       </View>
                       <Pressable
                         onPress={() => Linking.openURL(`tel:${trackingOrder.driverPhone || '+94782345678'}`)}

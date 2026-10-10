@@ -9,6 +9,7 @@ import {
   TextInput,
   Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {
   Truck,
@@ -38,7 +39,7 @@ import {
   FileText,
   Compass,
 } from 'lucide-react-native';
-import { useApp, db, doc, collection, onSnapshot, auth, isFirebaseConfigured } from '../../services/store';
+import { useApp, db, doc, collection, onSnapshot, auth, isFirebaseConfigured, mapFirestoreOrder } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusPill } from '../../components/ui/StatusPill';
@@ -92,6 +93,7 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
   } = useApp();
 
   const [liveOrder, setLiveOrder] = useState<Order | null>(null);
+  const [isAccepting, setIsAccepting] = useState(false);
 
   // Firestore real-time listener for this specific order
   useEffect(() => {
@@ -102,9 +104,8 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
     const unsub = onSnapshot(
       doc(db, 'orders', orderId),
       (docSnap) => {
-        const data = docSnap.data();
-        if (data) {
-          setLiveOrder(data as Order);
+        if (docSnap.exists()) {
+          setLiveOrder(mapFirestoreOrder(docSnap));
         }
       },
       (error) => {
@@ -116,7 +117,9 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
 
   const initialOrder = orders.find(o => o._id === orderId);
   const order = liveOrder || initialOrder;
-  const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
+  const currentDriverId =
+    auth.currentUser?.uid ||
+    (currentUser?.role === 'driver' ? (currentUser.uid || currentUser._id) : 'user_driver_1');
 
   if (!order) {
     return (
@@ -131,11 +134,15 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
     );
   }
 
-  const isAssignedToMe = order.driverId === currentDriverId;
+  const isAssignedToMe = Boolean(
+    order.driverId &&
+      (order.driverId === currentDriverId ||
+        (auth.currentUser && order.driverId === auth.currentUser.uid))
+  );
   const isAvailable =
-    order.deliveryType !== 'pickup' &&
+    order.deliveryType === 'delivery' &&
     order.status === 'ready_for_pickup' &&
-    (!order.driverId || order.driverId !== currentDriverId);
+    (!order.driverId || order.driverId === '');
 
   const pickupLocationText =
     order.pickupLocation?.address || order.farmerAddress || `${order.farmerName}'s Farm, Nuwara Eliya`;
@@ -362,24 +369,45 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
               variant="primary"
               size="lg"
               fullWidth
+              isLoading={isAccepting}
               leftIcon={<CheckCircle size={18} color="#FFFFFF" />}
-              onPress={() => {
-                driverAcceptOrder(order._id);
-                Alert.alert(
-                  'Delivery Mission Accepted!',
-                  'Assigned to active deliveries. Heading to pickup point at farm gate.',
-                  [
-                    {
-                      text: 'Go to Active Delivery',
-                      onPress: () => {
-                        onBack();
-                        setTab('deliveries');
+              onPress={async () => {
+                try {
+                  setIsAccepting(true);
+                  await driverAcceptOrder(order._id);
+                  Alert.alert(
+                    'Delivery Mission Accepted! 🚚',
+                    `Order ${order.orderNumber} is assigned to your active fleet. You can now start GPS navigation or inspect shipment items.`,
+                    [
+                      {
+                        text: 'Start GPS Navigation',
+                        onPress: () => {
+                          const pLoc = order.pickupLocation?.address || order.farmerAddress;
+                          openGoogleMaps(
+                            pLoc,
+                            order.pickupLocation?.lat,
+                            order.pickupLocation?.lng
+                          );
+                        },
                       },
-                    },
-                  ]
-                );
-                onBack();
-                setTab('deliveries');
+                      {
+                        text: 'Go to Active Deliveries',
+                        onPress: () => {
+                          onBack();
+                          setTab('deliveries');
+                        },
+                      },
+                      {
+                        text: 'Continue in Mission View',
+                        style: 'cancel',
+                      },
+                    ]
+                  );
+                } catch (err: any) {
+                  Alert.alert('Error', err?.message || 'Could not accept delivery mission.');
+                } finally {
+                  setIsAccepting(false);
+                }
               }}
             >
               Accept Delivery Mission (+LKR {order.deliveryFee?.toLocaleString() || '1,500'})
@@ -409,9 +437,13 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                 size="lg"
                 fullWidth
                 leftIcon={<CheckCircle size={18} color="#FFFFFF" />}
-                onPress={() => {
-                  driverConfirmPickup(order._id);
-                  Alert.alert('Pickup Confirmed', 'Crates verified and in transit to buyer doorstep!');
+                onPress={async () => {
+                  try {
+                    await driverConfirmPickup(order._id);
+                    Alert.alert('Pickup Confirmed', 'Crates verified and in transit to buyer doorstep!');
+                  } catch (err: any) {
+                    Alert.alert('Error', err?.message || 'Could not confirm pickup.');
+                  }
                 }}
               >
                 Confirm Pickup
@@ -436,9 +468,13 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
                 size="lg"
                 fullWidth
                 leftIcon={<CheckCircle size={18} color="#FFFFFF" />}
-                onPress={() => {
-                  driverConfirmDelivery(order._id, 'Delivered and verified by buyer');
-                  Alert.alert('Delivery Successful!', 'Delivery completed! Payout added to your Earnings.');
+                onPress={async () => {
+                  try {
+                    await driverConfirmDelivery(order._id, 'Delivered and verified by buyer');
+                    Alert.alert('Delivery Successful!', 'Delivery completed! Payout added to your Earnings.');
+                  } catch (err: any) {
+                    Alert.alert('Error', err?.message || 'Could not confirm delivery.');
+                  }
                 }}
               >
                 Confirm Delivery
@@ -475,21 +511,25 @@ export const DriverDeliveriesScreen: React.FC = () => {
     goToSubScreen,
   } = useApp();
 
-  const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
+  const [acceptingOrderId, setAcceptingOrderId] = useState<string | null>(null);
+
+  const currentDriverId =
+    auth.currentUser?.uid ||
+    (currentUser?.role === 'driver' ? (currentUser.uid || currentUser._id) : 'user_driver_1');
 
   // Available ready-for-pickup orders near the driver
   const availablePickups = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
+      o.deliveryType === 'delivery' &&
       o.status === 'ready_for_pickup' &&
-      (!o.driverId || o.driverId !== currentDriverId)
+      (!o.driverId || o.driverId === '')
   );
 
   // Active trips assigned to this driver
   const activeTrips = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
-      o.driverId === currentDriverId &&
+      o.deliveryType === 'delivery' &&
+      (o.driverId === currentDriverId || (auth.currentUser && o.driverId === auth.currentUser.uid)) &&
       (o.status === 'ready_for_pickup' || o.status === 'out_for_delivery')
   );
 
@@ -508,9 +548,9 @@ export const DriverDeliveriesScreen: React.FC = () => {
   // Completed deliveries
   const completedDeliveries = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
+      o.deliveryType === 'delivery' &&
       o.status === 'delivered' &&
-      (o.driverId === currentDriverId || !o.driverId)
+      (o.driverId === currentDriverId || (auth.currentUser && o.driverId === auth.currentUser.uid) || !o.driverId)
   );
 
   return (
@@ -531,21 +571,27 @@ export const DriverDeliveriesScreen: React.FC = () => {
             >
               Available
             </Text>
-            {availablePickups.length > 0 && (
-              <View
-                className={`px-1.5 py-0.2 rounded-full ${
-                  activeFilter === 'available' ? 'bg-[#FFFFFF]/25' : 'bg-amber-100'
+            <View
+              className={`px-1.5 py-0.5 rounded-full ${
+                activeFilter === 'available'
+                  ? 'bg-[#FFFFFF]/25'
+                  : availablePickups.length > 0
+                  ? 'bg-amber-100'
+                  : 'bg-slate-100'
+              }`}
+            >
+              <Text
+                className={`text-[10px] font-black ${
+                  activeFilter === 'available'
+                    ? 'text-white'
+                    : availablePickups.length > 0
+                    ? 'text-amber-800'
+                    : 'text-[#6B7280]'
                 }`}
               >
-                <Text
-                  className={`text-[10px] font-black ${
-                    activeFilter === 'available' ? 'text-white' : 'text-amber-800'
-                  }`}
-                >
-                  {availablePickups.length}
-                </Text>
-              </View>
-            )}
+                {availablePickups.length}
+              </Text>
+            </View>
           </Pressable>
 
           <Pressable
@@ -561,21 +607,27 @@ export const DriverDeliveriesScreen: React.FC = () => {
             >
               Active
             </Text>
-            {activeTrips.length > 0 && (
-              <View
-                className={`px-1.5 py-0.2 rounded-full ${
-                  activeFilter === 'active' ? 'bg-[#FFFFFF]/25' : 'bg-emerald-100'
+            <View
+              className={`px-1.5 py-0.5 rounded-full ${
+                activeFilter === 'active'
+                  ? 'bg-[#FFFFFF]/25'
+                  : activeTrips.length > 0
+                  ? 'bg-emerald-100'
+                  : 'bg-slate-100'
+              }`}
+            >
+              <Text
+                className={`text-[10px] font-black ${
+                  activeFilter === 'active'
+                    ? 'text-white'
+                    : activeTrips.length > 0
+                    ? 'text-emerald-800'
+                    : 'text-[#6B7280]'
                 }`}
               >
-                <Text
-                  className={`text-[10px] font-black ${
-                    activeFilter === 'active' ? 'text-white' : 'text-emerald-800'
-                  }`}
-                >
-                  {activeTrips.length}
-                </Text>
-              </View>
-            )}
+                {activeTrips.length}
+              </Text>
+            </View>
           </Pressable>
 
           <Pressable
@@ -592,13 +644,13 @@ export const DriverDeliveriesScreen: React.FC = () => {
               Completed
             </Text>
             <View
-              className={`px-1.5 py-0.2 rounded-full ${
+              className={`px-1.5 py-0.5 rounded-full ${
                 activeFilter === 'completed' ? 'bg-[#FFFFFF]/25' : 'bg-slate-100'
               }`}
             >
               <Text
                 className={`text-[10px] font-black ${
-                  activeFilter === 'completed' ? 'text-white' : 'text-slate-700'
+                  activeFilter === 'completed' ? 'text-white' : 'text-[#6B7280]'
                 }`}
               >
                 {completedDeliveries.length}
@@ -687,13 +739,49 @@ export const DriverDeliveriesScreen: React.FC = () => {
                       </Pressable>
 
                       <Pressable
-                        onPress={() => {
-                          driverAcceptOrder(order._id);
-                          Alert.alert('Delivery Accepted', 'Assigned to your fleet. Please head to pickup point.');
+                        disabled={acceptingOrderId === order._id}
+                        onPress={async () => {
+                          try {
+                            setAcceptingOrderId(order._id);
+                            await driverAcceptOrder(order._id);
+                            setActiveFilter('active');
+                            Alert.alert(
+                              'Delivery Mission Accepted! 🚚',
+                              `Order ${order.orderNumber} is assigned to your fleet. Head to ${order.farmerName}'s farm for produce pickup.`,
+                              [
+                                {
+                                  text: 'View Mission & Navigate',
+                                  style: 'default',
+                                  onPress: () => {
+                                    goToSubScreen('driver_order_detail', { orderId: order._id });
+                                  },
+                                },
+                                {
+                                  text: 'View Active Missions',
+                                  style: 'cancel',
+                                  onPress: () => {
+                                    setActiveFilter('active');
+                                  },
+                                },
+                              ]
+                            );
+                          } catch (err: any) {
+                            Alert.alert('Could Not Accept Job', err?.message || 'Failed to assign job to driver.');
+                          } finally {
+                            setAcceptingOrderId(null);
+                          }
                         }}
-                        className="flex-1 py-2 rounded-xl bg-[#1F5C3A] items-center justify-center active:bg-[#18492E]"
+                        className={`flex-1 py-2 rounded-xl items-center justify-center ${
+                          acceptingOrderId === order._id
+                            ? 'bg-[#1F5C3A]/70'
+                            : 'bg-[#1F5C3A] active:bg-[#18492E]'
+                        }`}
                       >
-                        <Text className="text-xs font-bold text-white">Accept Job</Text>
+                        {acceptingOrderId === order._id ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text className="text-xs font-bold text-white">Accept Job</Text>
+                        )}
                       </Pressable>
                     </View>
                   </Card>
@@ -807,9 +895,13 @@ export const DriverDeliveriesScreen: React.FC = () => {
                           size="md"
                           fullWidth
                           leftIcon={<CheckCircle size={16} color="#FFFFFF" />}
-                          onPress={() => {
-                            driverConfirmPickup(order._id);
-                            Alert.alert('Pickup Confirmed', 'Produce verified & crated. Now heading to buyer drop-off!');
+                          onPress={async () => {
+                            try {
+                              await driverConfirmPickup(order._id);
+                              Alert.alert('Pickup Confirmed', 'Produce verified & crated. Now heading to buyer drop-off!');
+                            } catch (err: any) {
+                              Alert.alert('Error', err?.message || 'Could not confirm pickup.');
+                            }
                           }}
                         >
                           Confirm Pickup
@@ -845,9 +937,13 @@ export const DriverDeliveriesScreen: React.FC = () => {
                           size="md"
                           fullWidth
                           leftIcon={<CheckCircle size={16} color="#FFFFFF" />}
-                          onPress={() => {
-                            driverConfirmDelivery(order._id, 'Handed over to buyer at doorstep');
-                            Alert.alert('Delivery Finished', 'Handover confirmed! Payment recorded.');
+                          onPress={async () => {
+                            try {
+                              await driverConfirmDelivery(order._id, 'Handed over to buyer at doorstep');
+                              Alert.alert('Delivery Finished', 'Handover confirmed! Payment recorded.');
+                            } catch (err: any) {
+                              Alert.alert('Error', err?.message || 'Could not confirm delivery.');
+                            }
                           }}
                         >
                           Confirm Delivery
@@ -918,13 +1014,15 @@ export const DriverDeliveriesScreen: React.FC = () => {
 // ============================================================================
 export const DriverEarningsScreen: React.FC = () => {
   const { orders, currentUser } = useApp();
-  const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
+  const currentDriverId =
+    auth.currentUser?.uid ||
+    (currentUser?.role === 'driver' ? (currentUser.uid || currentUser._id) : 'user_driver_1');
 
   const completedDeliveries = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
+      o.deliveryType === 'delivery' &&
       o.status === 'delivered' &&
-      (o.driverId === currentDriverId || !o.driverId)
+      (o.driverId === currentDriverId || (auth.currentUser && o.driverId === auth.currentUser.uid) || !o.driverId)
   );
 
   const deliveryEarnedTotal = completedDeliveries.reduce(
@@ -1342,7 +1440,9 @@ export const DriverProfileScreen: React.FC = () => {
 // ============================================================================
 export const DriverHomeScreen: React.FC = () => {
   const { orders, currentUser, goToSubScreen, updateCurrentUser } = useApp();
-  const currentDriverId = currentUser?.role === 'driver' ? currentUser._id : 'user_driver_1';
+  const currentDriverId =
+    auth.currentUser?.uid ||
+    (currentUser?.role === 'driver' ? (currentUser.uid || currentUser._id) : 'user_driver_1');
   const [isOnline, setIsOnline] = useState(currentUser?.isOnline ?? true);
 
   useEffect(() => {
@@ -1360,24 +1460,24 @@ export const DriverHomeScreen: React.FC = () => {
   // Available Pickup Jobs
   const availablePickups = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
+      o.deliveryType === 'delivery' &&
       o.status === 'ready_for_pickup' &&
-      (!o.driverId || o.driverId !== currentDriverId)
+      (!o.driverId || o.driverId === '')
   );
 
   // Active Trips
   const activeTrips = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
-      o.driverId === currentDriverId &&
+      o.deliveryType === 'delivery' &&
+      (o.driverId === currentDriverId || (auth.currentUser && o.driverId === auth.currentUser.uid)) &&
       (o.status === 'ready_for_pickup' || o.status === 'out_for_delivery')
   );
 
   const completedDeliveries = orders.filter(
     o =>
-      o.deliveryType !== 'pickup' &&
+      o.deliveryType === 'delivery' &&
       o.status === 'delivered' &&
-      (o.driverId === currentDriverId || !o.driverId)
+      (o.driverId === currentDriverId || (auth.currentUser && o.driverId === auth.currentUser.uid) || !o.driverId)
   );
 
   const todayEarnings = 4850 + completedDeliveries.length * 1500;
