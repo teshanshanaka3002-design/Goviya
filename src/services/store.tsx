@@ -5,6 +5,7 @@ import {
   Listing,
   ListingStatus,
   Order,
+  OrderItem,
   OrderStatus,
   Conversation,
   ChatMessage,
@@ -15,7 +16,6 @@ import {
 } from '../types';
 import {
   mockUsers,
-  mockOrders,
   mockConversations,
   mockChatMessages,
   mockMarketPrices,
@@ -26,6 +26,7 @@ import {
 import { DEFAULT_FARMER_AVATAR, GAMINI_FARMER_AVATAR, KAVINDA_FARMER_AVATAR } from './farmerAvatarData';
 import {
   auth,
+  functions,
   isFirebaseConfigured,
   formatAuthError,
   signInWithEmailAndPassword,
@@ -34,6 +35,7 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from './firebase';
+import { httpsCallable } from 'firebase/functions';
 import {
   db,
   doc,
@@ -48,10 +50,12 @@ import {
   query,
   where,
   serverTimestamp,
+  arrayUnion,
+  runTransaction,
   syncOrdersToFirestore,
 } from './firestore';
 
-export { db, doc, collection, onSnapshot, updateDoc, setDoc, deleteDoc, auth, isFirebaseConfigured };
+export { db, doc, collection, onSnapshot, updateDoc, setDoc, deleteDoc, auth, isFirebaseConfigured, arrayUnion, runTransaction };
 
 export interface PlaceOrderInput {
   deliveryType?: 'delivery' | 'pickup';
@@ -142,16 +146,16 @@ interface AppContextType {
   removeFromCart: (listingId: string) => void;
   clearCart: () => void;
   // Orders
-  placeOrder: (input: PlaceOrderInput) => Order;
-  advanceOrderStatus: (orderId: string) => void;
-  farmerAcceptOrder: (orderId: string) => void;
-  farmerRejectOrder: (orderId: string, reason: string) => void;
-  farmerUpdateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => void;
-  farmerConfirmPickupHandover: (orderId: string) => void;
-  driverAcceptOrder: (orderId: string) => void;
-  driverConfirmPickup: (orderId: string) => void;
-  driverConfirmDelivery: (orderId: string, proofNote?: string) => void;
-  buyerConfirmPickup: (orderId: string) => void;
+  placeOrder: (input: PlaceOrderInput) => Promise<Order>;
+  advanceOrderStatus: (orderId: string) => Promise<void>;
+  farmerAcceptOrder: (orderId: string) => Promise<void>;
+  farmerRejectOrder: (orderId: string, reason: string) => Promise<void>;
+  farmerUpdateOrderStatus: (orderId: string, status: OrderStatus, note?: string) => Promise<void>;
+  farmerConfirmPickupHandover: (orderId: string) => Promise<void>;
+  driverAcceptOrder: (orderId: string) => Promise<void>;
+  driverConfirmPickup: (orderId: string) => Promise<void>;
+  driverConfirmDelivery: (orderId: string, proofNote?: string) => Promise<void>;
+  buyerConfirmPickup: (orderId: string) => Promise<void>;
   // Listings
   addListing: (listingData: Omit<Listing, '_id' | 'farmerId' | 'farmerName' | 'farmerPhone' | 'farmerRating'>) => Promise<string>;
   updateListingStatus: (listingId: string, status: 'active' | 'out_of_stock' | 'removed') => void;
@@ -229,6 +233,49 @@ const formatOptionalTimestamp = (ts: any): string | undefined => {
   return undefined;
 };
 
+const mapFirestoreOrder = (docSnap: any): Order => {
+  const data = docSnap.data();
+  return {
+    _id: docSnap.id,
+    orderNumber: data.orderNumber || `GOV-${docSnap.id.slice(0, 6).toUpperCase()}`,
+    buyerId: data.buyerId || '',
+    buyerName: data.buyerName || 'Buyer',
+    buyerPhone: data.buyerPhone || '',
+    farmerId: data.farmerId || '',
+    farmerName: data.farmerName || 'Farmer',
+    farmerPhone: data.farmerPhone || '',
+    farmerAddress: data.farmerAddress || '',
+    driverId: data.driverId || undefined,
+    driverName: data.driverName || undefined,
+    driverPhone: data.driverPhone || undefined,
+    driverVehicle: data.driverVehicle || undefined,
+    items: Array.isArray(data.items) ? data.items : [],
+    subtotal: Number(data.subtotal || 0),
+    deliveryFee: Number(data.deliveryFee || 0),
+    serviceFee: Number(data.serviceFee || 0),
+    total: Number(data.total || 0),
+    paymentMethod: data.paymentMethod || 'cash_on_delivery',
+    deliveryType: data.deliveryType || 'delivery',
+    pickupLocation: data.pickupLocation,
+    pickupPin: data.pickupPin,
+    preparationNote: data.preparationNote,
+    deliveredAt: data.deliveredAt,
+    deliveredBy: data.deliveredBy,
+    deliveryProofNote: data.deliveryProofNote,
+    deliveryAddress: data.deliveryAddress || '',
+    deliveryDistrict: data.deliveryDistrict || '',
+    deliveryNotes: data.deliveryNotes,
+    deliveryTimeSlot: data.deliveryTimeSlot,
+    cashChangeDetails: data.cashChangeDetails,
+    cardDetails: data.cardDetails,
+    status: (data.status as OrderStatus) || 'pending',
+    rejectionReason: data.rejectionReason,
+    createdAt: formatTimestamp(data.createdAt),
+    updatedAt: formatOptionalTimestamp(data.updatedAt) || formatTimestamp(data.createdAt),
+    timeline: Array.isArray(data.timeline) ? data.timeline : [],
+  };
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Simulator frame toggle
   const [isSimulatorFrame, setIsSimulatorFrame] = useState<boolean>(() => {
@@ -297,10 +344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [listings, setListings] = useState<Listing[]>([]);
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = safeStorage.getItem(STORAGE_PREFIX + 'orders');
-    return saved ? JSON.parse(saved) : mockOrders;
-  });
+  const [orders, setOrders] = useState<Order[]>([]);
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     const saved = safeStorage.getItem(STORAGE_PREFIX + 'cart');
@@ -360,10 +404,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeStorage.setItem(STORAGE_PREFIX + 'cart', JSON.stringify(cart));
   }, [cart]);
 
-  useEffect(() => {
-    safeStorage.setItem(STORAGE_PREFIX + 'orders', JSON.stringify(orders));
-    syncOrdersToFirestore(orders);
-  }, [orders]);
 
 
   useEffect(() => {
@@ -506,6 +546,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     return () => unsubscribe();
+  }, [currentUser]);
+
+  // ----------------------------------------------------
+  // Firestore Real-Time Orders Listener
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
+    if (!currentUser || !auth.currentUser) {
+      setOrders([]);
+      return;
+    }
+
+    const currentUid = auth.currentUser.uid;
+    const currentRole = currentUser.role;
+
+    if (currentRole === 'admin') {
+      const ordersQuery = collection(db, 'orders');
+      const unsubscribe = onSnapshot(
+        ordersQuery,
+        (snapshot) => {
+          const loaded = snapshot.docs.map(mapFirestoreOrder);
+          setOrders(loaded);
+        },
+        (error) => {
+          console.error('FIRESTORE ADMIN ORDERS SNAPSHOT ERROR:', error);
+        }
+      );
+      return () => unsubscribe();
+    }
+
+    if (currentRole === 'farmer') {
+      const ordersQuery = query(collection(db, 'orders'), where('farmerId', '==', currentUid));
+      const unsubscribe = onSnapshot(
+        ordersQuery,
+        (snapshot) => {
+          const loaded = snapshot.docs.map(mapFirestoreOrder);
+          setOrders(loaded);
+        },
+        (error) => {
+          console.error('FIRESTORE FARMER ORDERS SNAPSHOT ERROR:', error);
+        }
+      );
+      return () => unsubscribe();
+    }
+
+    if (currentRole === 'buyer') {
+      const ordersQuery = query(collection(db, 'orders'), where('buyerId', '==', currentUid));
+      const unsubscribe = onSnapshot(
+        ordersQuery,
+        (snapshot) => {
+          const loaded = snapshot.docs.map(mapFirestoreOrder);
+          setOrders(loaded);
+        },
+        (error) => {
+          console.error('FIRESTORE BUYER ORDERS SNAPSHOT ERROR:', error);
+        }
+      );
+      return () => unsubscribe();
+    }
+
+    if (currentRole === 'driver') {
+      let readyOrders: Order[] = [];
+      let assignedOrders: Order[] = [];
+
+      const syncDriverOrders = () => {
+        const orderMap = new Map<string, Order>();
+        readyOrders.forEach(o => orderMap.set(o._id, o));
+        assignedOrders.forEach(o => orderMap.set(o._id, o));
+        setOrders(Array.from(orderMap.values()));
+      };
+
+      const unsubReady = onSnapshot(
+        query(collection(db, 'orders'), where('status', '==', 'ready_for_pickup')),
+        (snapshot) => {
+          readyOrders = snapshot.docs.map(mapFirestoreOrder);
+          syncDriverOrders();
+        },
+        (error) => {
+          console.error('FIRESTORE DRIVER READY ORDERS SNAPSHOT ERROR:', error);
+        }
+      );
+
+      const unsubAssigned = onSnapshot(
+        query(collection(db, 'orders'), where('driverId', '==', currentUid)),
+        (snapshot) => {
+          assignedOrders = snapshot.docs.map(mapFirestoreOrder);
+          syncDriverOrders();
+        },
+        (error) => {
+          console.error('FIRESTORE DRIVER ASSIGNED ORDERS SNAPSHOT ERROR:', error);
+        }
+      );
+
+      return () => {
+        unsubReady();
+        unsubAssigned();
+      };
+    }
   }, [currentUser]);
 
   // Actions
@@ -960,8 +1099,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Order operations
-  const placeOrder = (input: PlaceOrderInput): Order => {
-    if (!currentUser) {
+  const placeOrder = async (input: PlaceOrderInput): Promise<Order> => {
+    if (!currentUser || !auth.currentUser) {
       openAuth('buyer', 'login');
       throw new Error('Please log in or register before placing an order.');
     }
@@ -974,7 +1113,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deliveryAddress,
       district,
       paymentMethod,
-      notes,
+      notes = '',
       buyerName,
       buyerPhone,
       deliveryTimeSlot,
@@ -982,222 +1121,133 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cardDetails,
     } = input;
 
-    const firstItem = cart[0].listing;
-    const subtotal = cart.reduce((acc, item) => acc + item.listing.pricePerKg * item.quantityKg, 0);
-    const deliveryFee = deliveryType === 'pickup' ? 0 : 1500;
-    const serviceFee = 0;
-    const total = subtotal + deliveryFee;
+    const resolvedBuyerName = buyerName || currentUser.name || 'Commercial Buyer';
+    const resolvedBuyerPhone = buyerPhone || currentUser.phone || '';
 
-    const resolvedBuyerId = currentUser ? currentUser._id : `guest_${Date.now()}`;
-    const resolvedBuyerName = buyerName || currentUser?.name || 'Colombo Fresh Buyer';
-    const resolvedBuyerPhone = buyerPhone || currentUser?.phone || '+94 77 345 6789';
-
-    const newOrder: Order = {
-      _id: `ord_${Date.now()}`,
-      orderNumber: `GOV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-      buyerId: resolvedBuyerId,
-      buyerName: resolvedBuyerName,
-      buyerPhone: resolvedBuyerPhone,
-      farmerId: firstItem.farmerId,
-      farmerName: firstItem.farmerName,
-      farmerPhone: firstItem.farmerPhone,
-      farmerAddress: `${firstItem.location.town}, ${firstItem.location.district}`,
+    // Only send minimal untrusted inputs to the trusted Firebase Callable Cloud Function.
+    // Untrusted fields (buyerId, farmerId, prices, subtotals, totals, deliveryFee, stock) are never trusted from client.
+    const payload = {
       items: cart.map(item => ({
         listingId: item.listing._id,
-        cropName: item.listing.cropName,
-        category: item.listing.category,
-        photoUrl: item.listing.photos[0] || 'carrots',
         quantityKg: item.quantityKg,
-        pricePerKg: item.listing.pricePerKg,
       })),
-      subtotal,
-      deliveryFee,
-      serviceFee,
-      total,
-      paymentMethod,
       deliveryType,
-      pickupLocation: {
-        lat: firstItem.location.lat,
-        lng: firstItem.location.lng,
-        district: firstItem.location.district,
-        town: firstItem.location.town,
-        address: `${firstItem.farmerName}'s Farm, ${firstItem.location.town}, ${firstItem.location.district}`,
-        directions: `Located near ${firstItem.location.town} Agrarian Services Centre. Contact ${firstItem.farmerPhone} on approach.`,
-      },
-      pickupPin: `${Math.floor(1000 + Math.random() * 9000)}`,
-      deliveryAddress: deliveryType === 'pickup' ? `Direct Farm Gate Pickup (${firstItem.location.town})` : deliveryAddress,
-      deliveryDistrict: deliveryType === 'pickup' ? firstItem.location.district : district,
-      deliveryNotes: notes,
+      deliveryAddress,
+      district,
+      paymentMethod,
+      notes,
+      buyerName: resolvedBuyerName,
+      buyerPhone: resolvedBuyerPhone,
       deliveryTimeSlot: deliveryTimeSlot || 'Tomorrow (Morning 8:00 AM - 12:00 PM)',
-      cashChangeDetails,
-      cardDetails,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      timeline: [
-        {
-          status: 'pending',
-          label: deliveryType === 'pickup' ? 'Order Placed (Farm Self-Pickup)' : 'Order Placed (Doorstep Delivery)',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          note:
-            deliveryType === 'pickup'
-              ? `Direct farm pickup requested. Farmer ${firstItem.farmerName} received request to pack harvest at farm gate.`
-              : `Doorstep delivery requested. Farmer ${firstItem.farmerName} notified to prepare crates for driver dispatch. Payment: ${paymentMethod.replace(/_/g, ' ').toUpperCase()}`,
-        },
-      ],
+      cashChangeDetails: cashChangeDetails || '',
+      cardDetails: cardDetails || null,
     };
 
-    setOrders(prev => [newOrder, ...prev]);
+    const callPlaceOrder = httpsCallable<
+      typeof payload,
+      { success: boolean; orderIds: string[]; orders: any[] }
+    >(functions, 'placeOrder');
+
+    const response = await callPlaceOrder(payload);
+    const result = response.data;
+
+    if (!result || !result.success || !result.orderIds || result.orderIds.length === 0) {
+      throw new Error('Failed to place order. Backend returned an invalid response.');
+    }
+
+    // Attempt to load the primary order from Firestore using our typed mapper
+    let primaryOrder: Order | null = null;
+    try {
+      const primaryDocSnap = await getDoc(doc(db, 'orders', result.orderIds[0]));
+      if (primaryDocSnap.exists()) {
+        primaryOrder = mapFirestoreOrder(primaryDocSnap);
+      }
+    } catch (readErr) {
+      console.warn('Could not read created order directly from Firestore:', readErr);
+    }
+
+    // Fallback to order payload returned by Callable Cloud Function if read was delayed
+    if (!primaryOrder && result.orders && result.orders.length > 0) {
+      const raw = result.orders[0];
+      const nowIso = new Date().toISOString();
+      primaryOrder = {
+        ...raw,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      } as Order;
+    }
+
+    if (!primaryOrder) {
+      throw new Error('Order placed successfully, but order details could not be retrieved.');
+    }
+
+    // Update local state and clear cart
+    setOrders(prev => [primaryOrder!, ...prev.filter(o => o._id !== primaryOrder!._id)]);
     clearCart();
-    return newOrder;
+    return primaryOrder;
   };
 
-  const advanceOrderStatus = (orderId: string) => {
+  const advanceOrderStatus = async (orderId: string): Promise<void> => {
+    const target = orders.find(o => o._id === orderId);
+    if (!target) return;
+    if (target.status === 'pending') {
+      await farmerAcceptOrder(orderId);
+    } else if (target.status === 'accepted') {
+      await farmerUpdateOrderStatus(orderId, 'preparing');
+    } else if (target.status === 'preparing') {
+      await farmerUpdateOrderStatus(orderId, 'ready_for_pickup');
+    } else if (target.status === 'ready_for_pickup') {
+      if (target.deliveryType === 'pickup') {
+        await farmerConfirmPickupHandover(orderId);
+      } else {
+        await driverAcceptOrder(orderId);
+      }
+    } else if (target.status === 'out_for_delivery') {
+      await driverConfirmDelivery(orderId);
+    }
+  };
+
+  const farmerAcceptOrder = async (orderId: string): Promise<void> => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timelineItem = {
+      status: 'accepted' as OrderStatus,
+      label: 'Farmer Accepted Order',
+      timestamp: nowStr,
+      note: 'Harvest & packing preparation in progress',
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          if (ord.status === 'pending') {
-            return {
-              ...ord,
-              status: 'accepted' as OrderStatus,
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...ord.timeline,
-                {
-                  status: 'accepted',
-                  label: 'Farmer Accepted Order',
-                  timestamp: nowStr,
-                  note: `Farmer ${ord.farmerName} confirmed batch availability and scheduled morning harvest`,
-                },
-              ],
-            };
-          }
-          if (ord.status === 'accepted') {
-            return {
-              ...ord,
-              status: 'preparing' as OrderStatus,
-              preparationNote: 'Harvested freshly from field, washed, sorted Grade A and packed into crates',
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...ord.timeline,
-                {
-                  status: 'preparing',
-                  label: 'Harvesting & Packing in Crates',
-                  timestamp: nowStr,
-                  note: 'Produce harvested at farm gate, washed, quality graded and packed into crates',
-                },
-              ],
-            };
-          }
-          if (ord.status === 'preparing') {
-            const isPickup = ord.deliveryType === 'pickup';
-            return {
-              ...ord,
-              status: 'ready_for_pickup' as OrderStatus,
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...ord.timeline,
-                {
-                  status: 'ready_for_pickup',
-                  label: isPickup ? 'Ready for Buyer Farm Gate Pickup' : 'Ready for Logistics Driver Pickup',
-                  timestamp: nowStr,
-                  note: isPickup
-                    ? `Harvest packed and waiting at ${ord.farmerName}'s farm gate. Bring your Order PIN.`
-                    : 'Packed into crates, weighed, labeled and awaiting fleet driver dispatch at farm gate',
-                },
-              ],
-            };
-          }
-          if (ord.status === 'ready_for_pickup') {
-            if (ord.deliveryType === 'pickup') {
-              return {
-                ...ord,
-                status: 'delivered' as OrderStatus,
-                deliveredAt: nowStr,
-                deliveredBy: 'Direct Farm Gate Handover',
-                updatedAt: new Date().toISOString(),
-                timeline: [
-                  ...ord.timeline,
-                  {
-                    status: 'delivered',
-                    label: 'Collected from Farm Gate',
-                    timestamp: nowStr,
-                    note: `Buyer ${ord.buyerName} collected harvest directly from farmer ${ord.farmerName} at farm gate.`,
-                  },
-                ],
-              };
-            }
-            return {
-              ...ord,
-              status: 'out_for_delivery' as OrderStatus,
-              driverId: 'user_driver_1',
-              driverName: 'Roshan Kaluarachchi',
-              driverPhone: '+94 78 234 5678',
-              driverVehicle: 'Light Truck (Dimas) · WP - LG 8824',
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...ord.timeline,
-                {
-                  status: 'out_for_delivery',
-                  label: 'Collected by Driver & Out for Delivery',
-                  timestamp: nowStr,
-                  note: `Driver Roshan picked up produce crates from farmer ${ord.farmerName} at farm gate and is in transit to destination`,
-                },
-              ],
-            };
-          }
-          if (ord.status === 'out_for_delivery') {
-            return {
-              ...ord,
-              status: 'delivered' as OrderStatus,
-              deliveredAt: nowStr,
-              deliveredBy: ord.driverName || 'Logistics Driver',
-              deliveryProofNote: 'Confirmed by buyer at destination address',
-              updatedAt: new Date().toISOString(),
-              timeline: [
-                ...ord.timeline,
-                {
-                  status: 'delivered',
-                  label: 'Delivered Successfully to Buyer',
-                  timestamp: nowStr,
-                  note: `Driver ${ord.driverName || 'Roshan'} delivered parcel to buyer ${ord.buyerName} at ${ord.deliveryAddress}. Payment settled.`,
-                },
-              ],
-            };
-          }
-        }
-        return ord;
-      })
-    );
-  };
-
-  const farmerAcceptOrder = (orderId: string) => {
-    setOrders(prev =>
-      prev.map(ord => {
-        if (ord._id === orderId) {
-          const updatedTimeline = [
-            ...ord.timeline,
-            {
-              status: 'accepted' as OrderStatus,
-              label: 'Farmer Accepted Order',
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              note: 'Harvest & packing preparation in progress',
-            },
-          ];
           return {
             ...ord,
             status: 'accepted',
             updatedAt: new Date().toISOString(),
-            timeline: updatedTimeline,
+            timeline: [...ord.timeline, timelineItem],
           };
         }
         return ord;
       })
     );
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: 'accepted',
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
+    }
   };
 
-  const farmerRejectOrder = (orderId: string, reason: string) => {
+  const farmerRejectOrder = async (orderId: string, reason: string): Promise<void> => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timelineItem = {
+      status: 'rejected' as OrderStatus,
+      label: 'Order Declined by Farmer',
+      timestamp: nowStr,
+      note: reason,
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
@@ -1206,227 +1256,263 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             status: 'rejected',
             rejectionReason: reason,
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status: 'rejected' as OrderStatus,
-                label: 'Order Declined by Farmer',
-                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                note: reason,
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
         }
         return ord;
       })
     );
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: 'rejected',
+        rejectionReason: reason,
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
+    }
   };
 
-  const farmerUpdateOrderStatus = (orderId: string, status: OrderStatus, note?: string) => {
+  const farmerUpdateOrderStatus = async (orderId: string, status: OrderStatus, note?: string): Promise<void> => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const targetOrder = orders.find(o => o._id === orderId);
+    let label = status.replace(/_/g, ' ').toUpperCase();
+    if (status === 'preparing') {
+      label = 'Harvesting & Packing in Crates';
+    } else if (status === 'ready_for_pickup') {
+      label = targetOrder?.deliveryType === 'pickup' ? 'Ready for Buyer Farm Pickup' : 'Ready for Driver Pickup';
+    }
+
+    const defaultNote = status === 'ready_for_pickup'
+      ? (targetOrder?.deliveryType === 'pickup'
+          ? `Packed and awaiting buyer pickup at farm gate. Bring your Order PIN.`
+          : `Packed into crates, weighed, and awaiting fleet driver dispatch at farm gate`)
+      : (status === 'preparing' ? 'Produce harvested at farm gate, washed, quality graded and packed into crates' : undefined);
+
+    const timelineItem = {
+      status,
+      label,
+      timestamp: nowStr,
+      note: note || defaultNote,
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          let label = status.replace(/_/g, ' ').toUpperCase();
-          if (status === 'preparing') {
-            label = 'Harvesting & Packing in Crates';
-          } else if (status === 'ready_for_pickup') {
-            label = ord.deliveryType === 'pickup' ? 'Ready for Buyer Farm Pickup' : 'Ready for Driver Pickup';
-          }
-
           return {
             ...ord,
             status,
             preparationNote: note || ord.preparationNote,
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status,
-                label,
-                timestamp: nowStr,
-                note: note || (status === 'ready_for_pickup'
-                  ? (ord.deliveryType === 'pickup'
-                      ? `Packed and awaiting buyer pickup at ${ord.farmerName}'s farm gate. Bring your Order PIN.`
-                      : `Packed into crates, weighed, and awaiting fleet driver dispatch at ${ord.farmerName}'s farm gate`)
-                  : undefined),
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
         }
         return ord;
       })
     );
+
+    if (isFirebaseConfigured) {
+      const payload: any = {
+        status,
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      };
+      if (status === 'preparing' && (note || defaultNote)) {
+        payload.preparationNote = note || defaultNote;
+      }
+      await updateDoc(doc(db, 'orders', orderId), payload);
+    }
   };
 
-  const farmerConfirmPickupHandover = (orderId: string) => {
+  const farmerConfirmPickupHandover = async (orderId: string): Promise<void> => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timelineItem = {
+      status: 'delivered' as OrderStatus,
+      label: 'Harvest Handed Over to Buyer',
+      timestamp: nowStr,
+      note: `Farmer verified Order PIN and handed over produce at farm gate.`,
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           return {
             ...ord,
             status: 'delivered',
             deliveredAt: nowStr,
             deliveredBy: 'Direct Farm Gate Handover',
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status: 'delivered',
-                label: 'Harvest Handed Over to Buyer',
-                timestamp: nowStr,
-                note: `Farmer ${ord.farmerName} verified Order PIN and handed over produce to buyer ${ord.buyerName} at farm gate.`,
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
         }
         return ord;
       })
     );
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: 'delivered',
+        deliveredAt: nowStr,
+        deliveredBy: 'Direct Farm Gate Handover',
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
+    }
   };
 
-  const driverAcceptOrder = (orderId: string) => {
+  const driverAcceptOrder = async (orderId: string): Promise<void> => {
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const driverName = currentUser?.name || 'Roshan Kaluarachchi';
+    const driverId = auth.currentUser?.uid || currentUser?._id || 'user_driver_1';
+    const driverName = currentUser?.name || 'Logistics Driver';
     const driverPhone = currentUser?.phone || '+94 78 234 5678';
     const driverVehicle = currentUser?.vehiclePlate
-      ? `${currentUser.vehicleType} · ${currentUser.vehiclePlate}`
-      : 'Dimas Light Truck · WP - LG 8824';
+      ? `${currentUser.vehicleType || 'Light Truck'} · ${currentUser.vehiclePlate}`
+      : 'Light Truck · WP - LG 8824';
 
-    let updatedOrderObj: Order | null = null;
+    const timelineItem = {
+      status: 'ready_for_pickup' as OrderStatus,
+      label: `Logistics Driver Assigned (${driverName})`,
+      timestamp: nowStr,
+      note: `Driver ${driverName} assigned to collect order and deliver.`,
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const updated: Order = {
+          return {
             ...ord,
-            driverId: currentUser?._id || 'user_driver_1',
+            driverId,
             driverName,
             driverPhone,
             driverVehicle,
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status: ord.status,
-                label: `Logistics Driver Assigned (${driverName})`,
-                timestamp: nowStr,
-                note: `Driver ${driverName} assigned to collect from ${ord.farmerName}'s farm and deliver to ${ord.deliveryDistrict}.`,
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
-          updatedOrderObj = updated;
-          return updated;
         }
         return ord;
       })
     );
-    if (updatedOrderObj) {
-      updateDoc(doc(db, 'orders', orderId), updatedOrderObj);
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        driverId,
+        driverName,
+        driverPhone,
+        driverVehicle,
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
     }
   };
 
-  const driverConfirmPickup = (orderId: string) => {
+  const driverConfirmPickup = async (orderId: string): Promise<void> => {
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    let updatedOrderObj: Order | null = null;
+    const driverName = currentUser?.name || 'Logistics Driver';
+    const timelineItem = {
+      status: 'out_for_delivery' as OrderStatus,
+      label: 'Produce Picked Up & Out For Delivery',
+      timestamp: nowStr,
+      note: `Driver ${driverName} collected produce crates from farm gate. On transit to destination.`,
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const driverName = ord.driverName || currentUser?.name || 'Roshan Kaluarachchi';
-          const updated: Order = {
+          return {
             ...ord,
             status: 'out_for_delivery',
-            driverId: ord.driverId || currentUser?._id || 'user_driver_1',
-            driverName,
-            driverPhone: ord.driverPhone || currentUser?.phone || '+94 78 234 5678',
-            driverVehicle:
-              ord.driverVehicle ||
-              (currentUser?.vehiclePlate
-                ? `${currentUser.vehicleType} · ${currentUser.vehiclePlate}`
-                : 'Dimas Light Truck · WP - LG 8824'),
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status: 'out_for_delivery',
-                label: 'Produce Picked Up & Out For Delivery',
-                timestamp: nowStr,
-                note: `Driver ${driverName} collected produce crates from farmer ${ord.farmerName} at farm gate. On transit to destination.`,
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
-          updatedOrderObj = updated;
-          return updated;
         }
         return ord;
       })
     );
-    if (updatedOrderObj) {
-      updateDoc(doc(db, 'orders', orderId), updatedOrderObj);
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: 'out_for_delivery',
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
     }
   };
 
-  const driverConfirmDelivery = (orderId: string, proofNote?: string) => {
+  const driverConfirmDelivery = async (orderId: string, proofNote?: string): Promise<void> => {
     const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    let updatedOrderObj: Order | null = null;
+    const driverName = currentUser?.name || 'Logistics Driver';
+    const timelineItem = {
+      status: 'delivered' as OrderStatus,
+      label: 'Successfully Delivered to Buyer',
+      timestamp: nowStr,
+      note: `Driver ${driverName} delivered parcel to destination address. Handover verified.`,
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const driverName = ord.driverName || currentUser?.name || 'Roshan Kaluarachchi';
-          const updated: Order = {
+          return {
             ...ord,
             status: 'delivered',
             deliveredAt: nowStr,
             deliveredBy: driverName,
             deliveryProofNote: proofNote || 'Delivered & verified by recipient at doorstep',
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status: 'delivered',
-                label: 'Successfully Delivered to Buyer',
-                timestamp: nowStr,
-                note: `Driver ${driverName} delivered parcel to buyer ${ord.buyerName} at ${ord.deliveryAddress}. Handover verified.`,
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
-          updatedOrderObj = updated;
-          return updated;
         }
         return ord;
       })
     );
-    if (updatedOrderObj) {
-      updateDoc(doc(db, 'orders', orderId), updatedOrderObj);
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: 'delivered',
+        deliveredAt: nowStr,
+        deliveredBy: driverName,
+        deliveryProofNote: proofNote || 'Delivered & verified by recipient at doorstep',
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
     }
   };
 
-  const buyerConfirmPickup = (orderId: string) => {
+  const buyerConfirmPickup = async (orderId: string): Promise<void> => {
+    const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timelineItem = {
+      status: 'delivered' as OrderStatus,
+      label: 'Collected from Farm Gate',
+      timestamp: nowStr,
+      note: 'Buyer verified Order PIN and collected fresh produce directly from farm gate.',
+    };
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
-          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           return {
             ...ord,
             status: 'delivered',
             deliveredAt: nowStr,
             deliveredBy: 'Direct Farm Gate Handover',
-            deliveryProofNote: `Handed over at ${ord.farmerName}'s farm gate. Order PIN ${ord.pickupPin} verified.`,
+            deliveryProofNote: `Handed over at farm gate. Order PIN ${ord.pickupPin} verified.`,
             updatedAt: new Date().toISOString(),
-            timeline: [
-              ...ord.timeline,
-              {
-                status: 'delivered',
-                label: 'Collected from Farm Gate',
-                timestamp: nowStr,
-                note: `Buyer ${ord.buyerName} verified Order PIN ${ord.pickupPin} and collected fresh produce directly from farmer ${ord.farmerName}. Handover complete.`,
-              },
-            ],
+            timeline: [...ord.timeline, timelineItem],
           };
         }
         return ord;
       })
     );
+
+    if (isFirebaseConfigured) {
+      await updateDoc(doc(db, 'orders', orderId), {
+        status: 'delivered',
+        deliveredAt: nowStr,
+        deliveredBy: 'Direct Farm Gate Handover',
+        deliveryProofNote: 'Handed over at farm gate.',
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineItem),
+      });
+    }
   };
 
   const addListing = async (

@@ -13,6 +13,8 @@ import {
   orderBy,
   limit,
   serverTimestamp,
+  arrayUnion,
+  runTransaction,
   DocumentReference,
   CollectionReference,
   DocumentSnapshot,
@@ -38,6 +40,8 @@ export {
   orderBy,
   limit,
   serverTimestamp,
+  arrayUnion,
+  runTransaction,
 };
 
 export type {

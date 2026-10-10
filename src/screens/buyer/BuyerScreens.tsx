@@ -2006,7 +2006,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
   };
 
   // Step 2A: Confirm COD order
-  const handlePlaceCodOrder = () => {
+  const handlePlaceCodOrder = async () => {
     if (!currentUser) {
       openAuth('buyer', 'login');
       return;
@@ -2020,7 +2020,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
     }
 
     try {
-      const order = placeOrder({
+      const order = await placeOrder({
         deliveryType: deliveryMode,
         deliveryAddress: address,
         district,
@@ -2036,7 +2036,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
   };
 
   // Step 2B: Pay with Card
-  const handlePlaceCardOrder = () => {
+  const handlePlaceCardOrder = async () => {
     if (!currentUser) {
       openAuth('buyer', 'login');
       return;
@@ -2060,7 +2060,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
     }
 
     try {
-      const order = placeOrder({
+      const order = await placeOrder({
         deliveryType: deliveryMode,
         deliveryAddress: address,
         district,
@@ -2080,7 +2080,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
   };
 
   // Step 2C: Pay via Mobile Wallet
-  const handlePlaceWalletOrder = () => {
+  const handlePlaceWalletOrder = async () => {
     if (!currentUser) {
       openAuth('buyer', 'login');
       return;
@@ -2091,7 +2091,7 @@ export const BuyerCheckoutScreen: React.FC = () => {
     }
 
     try {
-      const order = placeOrder({
+      const order = await placeOrder({
         deliveryType: deliveryMode,
         deliveryAddress: address,
         district,
@@ -2770,7 +2770,7 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
     const unsub = onSnapshot(doc(db, 'orders', initialActiveOrder._id), (docSnap) => {
       const data = docSnap.data();
       if (data) {
-        setRealtimeOrder(data as Order);
+        setRealtimeOrder({ _id: docSnap.id, ...data } as Order);
       }
     });
     return () => unsub();

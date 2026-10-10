@@ -59,7 +59,7 @@ export const FarmerOrdersScreen: React.FC = () => {
     const unsub = onSnapshot(doc(db, 'orders', trackingOrder._id), (docSnap) => {
       const data = docSnap.data();
       if (data) {
-        setTrackingOrder(data as Order);
+        setTrackingOrder({ _id: docSnap.id, ...data } as Order);
       }
     });
     return () => unsub();

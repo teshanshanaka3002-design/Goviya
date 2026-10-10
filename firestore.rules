@@ -24,6 +24,12 @@ service cloud.firestore {
         && currentUser().isDeactivated == false;
     }
 
+    function isDriver() {
+      return signedIn()
+        && currentUser().role == 'driver'
+        && currentUser().isDeactivated == false;
+    }
+
     match /users/{userId} {
 
       allow read: if signedIn();
@@ -78,11 +84,117 @@ service cloud.firestore {
 
       // Farmer can edit/delete only their own listing.
       // Admin can manage any listing.
-      allow update, delete: if isAdmin() ||
+      // Buyer and Driver must never be able to modify listing documents.
+      allow update: if isAdmin() ||
         (
           isVerifiedFarmer()
           && resource.data.farmerId == request.auth.uid
         );
+
+      allow delete: if isAdmin() ||
+        (
+          isVerifiedFarmer()
+          && resource.data.farmerId == request.auth.uid
+        );
+    }
+
+    match /orders/{orderId} {
+
+      function isBuyerOrderUpdate() {
+        let isOwner = signedIn() && resource.data.buyerId == request.auth.uid;
+        let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
+          && request.resource.data.farmerId == resource.data.farmerId
+          && request.resource.data.items == resource.data.items
+          && request.resource.data.subtotal == resource.data.subtotal
+          && request.resource.data.deliveryFee == resource.data.deliveryFee
+          && request.resource.data.total == resource.data.total
+          && request.resource.data.paymentMethod == resource.data.paymentMethod
+          && request.resource.data.deliveryType == resource.data.deliveryType
+          && (!('driverId' in resource.data) ? (!('driverId' in request.resource.data) || request.resource.data.driverId == null) : request.resource.data.driverId == resource.data.driverId);
+
+        let isCancel = resource.data.status == 'pending' && request.resource.data.status == 'cancelled';
+        let isFarmPickupConfirm = resource.data.status == 'ready_for_pickup'
+          && resource.data.deliveryType == 'pickup'
+          && request.resource.data.status == 'delivered';
+
+        return isOwner && unchangedCore && (isCancel || isFarmPickupConfirm);
+      }
+
+      function isFarmerOrderUpdate() {
+        let isOwnerFarmer = isVerifiedFarmer() && resource.data.farmerId == request.auth.uid;
+        let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
+          && request.resource.data.farmerId == resource.data.farmerId
+          && request.resource.data.items == resource.data.items
+          && request.resource.data.subtotal == resource.data.subtotal
+          && request.resource.data.deliveryFee == resource.data.deliveryFee
+          && request.resource.data.total == resource.data.total
+          && (!('driverId' in resource.data) ? (!('driverId' in request.resource.data) || request.resource.data.driverId == null) : request.resource.data.driverId == resource.data.driverId);
+
+        let validStatus = (resource.data.status == 'pending' && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected'))
+          || (resource.data.status == 'accepted' && request.resource.data.status == 'preparing')
+          || (resource.data.status == 'preparing' && request.resource.data.status == 'ready_for_pickup')
+          || (resource.data.status == 'ready_for_pickup' && resource.data.deliveryType == 'pickup' && request.resource.data.status == 'delivered');
+
+        return isOwnerFarmer && unchangedCore && validStatus;
+      }
+
+      function isDriverOrderUpdate() {
+        let isEligibleDriver = isDriver();
+        let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
+          && request.resource.data.farmerId == resource.data.farmerId
+          && request.resource.data.items == resource.data.items
+          && request.resource.data.subtotal == resource.data.subtotal
+          && request.resource.data.deliveryFee == resource.data.deliveryFee
+          && request.resource.data.total == resource.data.total
+          && request.resource.data.deliveryType == 'delivery';
+
+        // 1. Driver Accepts available delivery job
+        let isAcceptingJob = resource.data.status == 'ready_for_pickup'
+          && (!('driverId' in resource.data) || resource.data.driverId == null || resource.data.driverId == '')
+          && request.resource.data.driverId == request.auth.uid
+          && request.resource.data.status == 'ready_for_pickup';
+
+        // 2. Assigned Driver progresses to out_for_delivery or delivered
+        let isAssignedDriver = resource.data.driverId == request.auth.uid
+          && request.resource.data.driverId == request.auth.uid;
+
+        let isValidTransitTransition = isAssignedDriver && (
+          (resource.data.status == 'ready_for_pickup' && request.resource.data.status == 'out_for_delivery') ||
+          (resource.data.status == 'out_for_delivery' && request.resource.data.status == 'delivered')
+        );
+
+        return isEligibleDriver && unchangedCore && (isAcceptingJob || isValidTransitTransition);
+      }
+
+      // Buyer can read only their own orders.
+      // Farmer can read only orders for their listings.
+      // Driver can see eligible delivery jobs (ready_for_pickup) and assigned deliveries.
+      // Admin can read all orders.
+      allow read: if isAdmin() ||
+        (
+          signedIn() && (
+            resource.data.buyerId == request.auth.uid ||
+            resource.data.farmerId == request.auth.uid ||
+            (
+              isDriver() && (
+                resource.data.driverId == request.auth.uid ||
+                resource.data.status == 'ready_for_pickup'
+              )
+            )
+          )
+        );
+
+      // Order creation is strictly managed by the trusted Cloud Function (Admin SDK) or Admin.
+      // Client-side users cannot directly create arbitrary orders.
+      allow create: if isAdmin();
+
+      // Explicitly hardened update permissions by role
+      allow update: if isAdmin()
+        || isBuyerOrderUpdate()
+        || isFarmerOrderUpdate()
+        || isDriverOrderUpdate();
+
+      allow delete: if isAdmin();
     }
   }
 }
