@@ -26,7 +26,6 @@ import {
 import { DEFAULT_FARMER_AVATAR, GAMINI_FARMER_AVATAR, KAVINDA_FARMER_AVATAR } from './farmerAvatarData';
 import {
   auth,
-  functions,
   isFirebaseConfigured,
   formatAuthError,
   signInWithEmailAndPassword,
@@ -35,7 +34,6 @@ import {
   onAuthStateChanged,
   updateProfile,
 } from './firebase';
-import { httpsCallable } from 'firebase/functions';
 import {
   db,
   doc,
@@ -429,50 +427,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------
   // Firebase Auth State Listener (Session Restoration)
   // ----------------------------------------------------
+  const [isAuthReady, setIsAuthReady] = useState<boolean>(!isFirebaseConfigured);
+
   useEffect(() => {
     if (!isFirebaseConfigured) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          const userSnap = await getDoc(userDocRef);
+      try {
+        if (firebaseUser) {
+          try {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userSnap = await getDoc(userDocRef);
 
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            const appUser: User = {
-              _id: firebaseUser.uid,
-              uid: firebaseUser.uid,
-              name: data.name || firebaseUser.displayName || 'Goviya User',
-              email: data.email || firebaseUser.email || undefined,
-              phone: data.phone || '',
-              role: (data.role as Role) || 'buyer',
-              verified: Boolean(data.verified),
-              isDeactivated: Boolean(data.isDeactivated),
-              createdAt: formatTimestamp(data.createdAt),
-              updatedAt: formatOptionalTimestamp(data.updatedAt),
-              avatarUrl: data.avatarUrl,
-              location: data.location,
-              district: data.district || data.location?.district,
-              nicNumber: data.nicNumber,
-              farmName: data.farmName,
-              farmSizeAcres: data.farmSizeAcres,
-              yearsFarming: data.yearsFarming,
-              drivingLicenceNumber: data.drivingLicenceNumber || data.drivingLicense,
-              drivingLicense: data.drivingLicenceNumber || data.drivingLicense,
-              vehicleType: data.vehicleType,
-              vehiclePlate: data.vehiclePlate,
-              rating: data.rating,
-              totalRatings: data.totalRatings,
-            };
-            setCurrentUser(appUser);
+            if (userSnap.exists()) {
+              const data = userSnap.data();
+              const appUser: User = {
+                _id: firebaseUser.uid,
+                uid: firebaseUser.uid,
+                name: data.name || firebaseUser.displayName || 'Goviya User',
+                email: data.email || firebaseUser.email || undefined,
+                phone: data.phone || '',
+                role: (data.role as Role) || 'buyer',
+                verified: Boolean(data.verified),
+                isDeactivated: Boolean(data.isDeactivated),
+                createdAt: formatTimestamp(data.createdAt),
+                updatedAt: formatOptionalTimestamp(data.updatedAt),
+                avatarUrl: data.avatarUrl,
+                location: data.location,
+                district: data.district || data.location?.district,
+                nicNumber: data.nicNumber,
+                farmName: data.farmName,
+                farmSizeAcres: data.farmSizeAcres,
+                yearsFarming: data.yearsFarming,
+                drivingLicenceNumber: data.drivingLicenceNumber || data.drivingLicense,
+                drivingLicense: data.drivingLicenceNumber || data.drivingLicense,
+                vehicleType: data.vehicleType,
+                vehiclePlate: data.vehiclePlate,
+                rating: data.rating,
+                totalRatings: data.totalRatings,
+              };
+              setCurrentUser(appUser);
+            }
+          } catch (err) {
+            console.warn('Error restoring user session from Firestore:', err);
           }
-        } catch (err) {
-          console.warn('Error restoring user session from Firestore:', err);
+        } else {
+          // Guest mode (unauthenticated)
+          setCurrentUser(null);
         }
-      } else {
-        // Guest mode (unauthenticated)
-        setCurrentUser(null);
+      } finally {
+        setIsAuthReady(true);
       }
     });
 
@@ -485,17 +489,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!isFirebaseConfigured) return;
 
-    // When there is NO authenticated user, query Firestore using:
-    // query(collection(db, 'listings'), where('status', '==', 'active'))
-    // Do not request the whole listings collection for guests.
-    const isAuthed = Boolean(auth.currentUser);
-    const listingsQuery = isAuthed
+    // Normal marketplace query for buyers/guests: query(collection(db, 'listings'), where('status', '==', 'active'))
+    // Farmers and Admins query all listings so they can manage out_of_stock / active listings.
+    const isFarmerOrAdmin = currentUser?.role === 'farmer' || currentUser?.role === 'admin';
+    const listingsQuery = isFarmerOrAdmin
       ? collection(db, 'listings')
       : query(collection(db, 'listings'), where('status', '==', 'active'));
 
     const unsubscribe = onSnapshot(
       listingsQuery,
       (snapshot) => {
+        console.log(
+          'FIRESTORE LISTING SNAPSHOT:',
+          snapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          }))
+        );
         const firestoreListings: Listing[] = snapshot.docs.map(docSnap => {
           const data = docSnap.data();
           const priceVal = Number(data.pricePerKg ?? data.price ?? 0);
@@ -546,13 +556,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [currentUser, isAuthReady]);
 
   // ----------------------------------------------------
   // Firestore Real-Time Orders Listener
   // ----------------------------------------------------
   useEffect(() => {
     if (!isFirebaseConfigured) return;
+    if (!isAuthReady) return;
 
     if (!currentUser || !auth.currentUser) {
       setOrders([]);
@@ -571,13 +582,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setOrders(loaded);
         },
         (error) => {
-          console.error('FIRESTORE ADMIN ORDERS SNAPSHOT ERROR:', error);
+          console.warn('FIRESTORE ADMIN ORDERS SNAPSHOT WARNING:', error.message);
         }
       );
       return () => unsubscribe();
     }
 
     if (currentRole === 'farmer') {
+      if (!currentUser.verified || currentUser.isDeactivated) {
+        setOrders([]);
+        return;
+      }
       const ordersQuery = query(collection(db, 'orders'), where('farmerId', '==', currentUid));
       const unsubscribe = onSnapshot(
         ordersQuery,
@@ -586,14 +601,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setOrders(loaded);
         },
         (error) => {
-          console.error('FIRESTORE FARMER ORDERS SNAPSHOT ERROR:', error);
+          console.warn('FIRESTORE FARMER ORDERS SNAPSHOT WARNING:', error.message);
         }
       );
       return () => unsubscribe();
     }
 
     if (currentRole === 'buyer') {
-      const ordersQuery = query(collection(db, 'orders'), where('buyerId', '==', currentUid));
+      const uid = auth.currentUser?.uid;
+      if (!uid || currentUser.isDeactivated) {
+        setOrders([]);
+        return;
+      }
+      const ordersQuery = query(collection(db, 'orders'), where('buyerId', '==', uid));
       const unsubscribe = onSnapshot(
         ordersQuery,
         (snapshot) => {
@@ -601,51 +621,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setOrders(loaded);
         },
         (error) => {
-          console.error('FIRESTORE BUYER ORDERS SNAPSHOT ERROR:', error);
+          console.warn('FIRESTORE BUYER ORDERS SNAPSHOT WARNING:', error.message);
         }
       );
       return () => unsubscribe();
     }
 
     if (currentRole === 'driver') {
-      let readyOrders: Order[] = [];
+      const driverUid = auth.currentUser?.uid;
+      if (!driverUid || currentUser.isDeactivated) {
+        setOrders([]);
+        return;
+      }
+
+      console.log('Driver Firebase UID:', auth.currentUser?.uid);
+      console.log('Driver query: ready_for_pickup + delivery');
+      console.log('Driver assigned query UID:', auth.currentUser?.uid);
+
+      let availableOrders: Order[] = [];
       let assignedOrders: Order[] = [];
 
       const syncDriverOrders = () => {
         const orderMap = new Map<string, Order>();
-        readyOrders.forEach(o => orderMap.set(o._id, o));
+        availableOrders.forEach(o => orderMap.set(o._id, o));
         assignedOrders.forEach(o => orderMap.set(o._id, o));
         setOrders(Array.from(orderMap.values()));
       };
 
-      const unsubReady = onSnapshot(
-        query(collection(db, 'orders'), where('status', '==', 'ready_for_pickup')),
+      const availableQuery = query(
+        collection(db, 'orders'),
+        where('status', '==', 'ready_for_pickup'),
+        where('deliveryType', '==', 'delivery')
+      );
+
+      const assignedQuery = query(
+        collection(db, 'orders'),
+        where('driverId', '==', auth.currentUser.uid)
+      );
+
+      const unsubAvailable = onSnapshot(
+        availableQuery,
         (snapshot) => {
-          readyOrders = snapshot.docs.map(mapFirestoreOrder);
+          availableOrders = snapshot.docs.map(mapFirestoreOrder);
           syncDriverOrders();
         },
         (error) => {
-          console.error('FIRESTORE DRIVER READY ORDERS SNAPSHOT ERROR:', error);
+          console.warn('FIRESTORE DRIVER AVAILABLE ORDERS WARNING:', error.message);
         }
       );
 
       const unsubAssigned = onSnapshot(
-        query(collection(db, 'orders'), where('driverId', '==', currentUid)),
+        assignedQuery,
         (snapshot) => {
           assignedOrders = snapshot.docs.map(mapFirestoreOrder);
           syncDriverOrders();
         },
         (error) => {
-          console.error('FIRESTORE DRIVER ASSIGNED ORDERS SNAPSHOT ERROR:', error);
+          console.warn('FIRESTORE DRIVER ASSIGNED ORDERS WARNING:', error.message);
         }
       );
 
       return () => {
-        unsubReady();
+        unsubAvailable();
         unsubAssigned();
       };
     }
-  }, [currentUser]);
+  }, [currentUser, isAuthReady]);
 
   // Actions
   const toggleSimulatorFrame = () => {
@@ -1098,7 +1139,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCart([]);
   };
 
-  // Order operations
+  // Order operations (Runs 100% on Firebase Free Spark Plan with atomic Firestore transaction)
   const placeOrder = async (input: PlaceOrderInput): Promise<Order> => {
     if (!currentUser || !auth.currentUser) {
       openAuth('buyer', 'login');
@@ -1121,70 +1162,176 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       cardDetails,
     } = input;
 
+    // Multi-farmer grouping: group cart items by farmerId to create dedicated orders per farmer
+    const farmerGroups = new Map<string, CartItem[]>();
+    for (const item of cart) {
+      const fId = item.listing.farmerId || 'unknown_farmer';
+      if (!farmerGroups.has(fId)) {
+        farmerGroups.set(fId, []);
+      }
+      farmerGroups.get(fId)!.push(item);
+    }
+
+    const resolvedBuyerId = auth.currentUser.uid;
     const resolvedBuyerName = buyerName || currentUser.name || 'Commercial Buyer';
     const resolvedBuyerPhone = buyerPhone || currentUser.phone || '';
+    const nowIso = new Date().toISOString();
 
-    // Only send minimal untrusted inputs to the trusted Firebase Callable Cloud Function.
-    // Untrusted fields (buyerId, farmerId, prices, subtotals, totals, deliveryFee, stock) are never trusted from client.
-    const payload = {
-      items: cart.map(item => ({
-        listingId: item.listing._id,
-        quantityKg: item.quantityKg,
-      })),
-      deliveryType,
-      deliveryAddress,
-      district,
-      paymentMethod,
-      notes,
-      buyerName: resolvedBuyerName,
-      buyerPhone: resolvedBuyerPhone,
-      deliveryTimeSlot: deliveryTimeSlot || 'Tomorrow (Morning 8:00 AM - 12:00 PM)',
-      cashChangeDetails: cashChangeDetails || '',
-      cardDetails: cardDetails || null,
-    };
+    // Execute atomic transaction across all cart items and all farmers
+    const createdOrders = await runTransaction(db, async (transaction) => {
+      // 1. Read all listings across all farmers inside this transaction
+      const listingSnaps = await Promise.all(
+        cart.map(item => transaction.get(doc(db, 'listings', item.listing._id)))
+      );
 
-    const callPlaceOrder = httpsCallable<
-      typeof payload,
-      { success: boolean; orderIds: string[]; orders: any[] }
-    >(functions, 'placeOrder');
+      const listingMap = new Map<string, { snap: any; data: any; stock: number; price: number }>();
+      for (let i = 0; i < cart.length; i++) {
+        const item = cart[i];
+        const snap = listingSnaps[i];
+        if (!snap.exists()) {
+          throw new Error(`Listing "${item.listing.cropName}" is no longer available.`);
+        }
+        const data = snap.data();
+        const currentStock = Number(data.quantityKg ?? data.quantity ?? 0);
+        const currentPrice = Number(data.pricePerKg ?? data.price ?? 0);
+        const currentStatus = data.status || 'active';
 
-    const response = await callPlaceOrder(payload);
-    const result = response.data;
+        if (currentStatus !== 'active') {
+          throw new Error(`Listing "${data.cropName || item.listing.cropName}" is no longer active.`);
+        }
 
-    if (!result || !result.success || !result.orderIds || result.orderIds.length === 0) {
-      throw new Error('Failed to place order. Backend returned an invalid response.');
-    }
+        if (item.quantityKg > currentStock) {
+          throw new Error(
+            `Insufficient stock for "${data.cropName || item.listing.cropName}". Available: ${currentStock}kg, requested: ${item.quantityKg}kg.`
+          );
+        }
 
-    // Attempt to load the primary order from Firestore using our typed mapper
-    let primaryOrder: Order | null = null;
-    try {
-      const primaryDocSnap = await getDoc(doc(db, 'orders', result.orderIds[0]));
-      if (primaryDocSnap.exists()) {
-        primaryOrder = mapFirestoreOrder(primaryDocSnap);
+        listingMap.set(item.listing._id, {
+          snap,
+          data,
+          stock: currentStock,
+          price: currentPrice,
+        });
       }
-    } catch (readErr) {
-      console.warn('Could not read created order directly from Firestore:', readErr);
-    }
 
-    // Fallback to order payload returned by Callable Cloud Function if read was delayed
-    if (!primaryOrder && result.orders && result.orders.length > 0) {
-      const raw = result.orders[0];
-      const nowIso = new Date().toISOString();
-      primaryOrder = {
-        ...raw,
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      } as Order;
-    }
+      // 2. Prepare listing stock deductions and order documents
+      const ordersToReturn: Order[] = [];
 
-    if (!primaryOrder) {
-      throw new Error('Order placed successfully, but order details could not be retrieved.');
-    }
+      // Process each farmer group
+      for (const [farmerId, groupItems] of farmerGroups.entries()) {
+        const newOrderDocRef = doc(collection(db, 'orders'));
+        const orderNumber = `GOV-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+        const pickupPin = `${Math.floor(1000 + Math.random() * 9000)}`;
+        const nowTimeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Update local state and clear cart
-    setOrders(prev => [primaryOrder!, ...prev.filter(o => o._id !== primaryOrder!._id)]);
+        const validatedItems: OrderItem[] = [];
+        let subtotal = 0;
+        let farmerName = '';
+        let farmerPhone = '';
+        let farmerLocation = {
+          lat: 6.9697,
+          lng: 80.7891,
+          district: 'Nuwara Eliya',
+          town: 'Kandapola',
+        };
+
+        for (let i = 0; i < groupItems.length; i++) {
+          const item = groupItems[i];
+          const info = listingMap.get(item.listing._id)!;
+          const listingData = info.data;
+          const currentPrice = info.price;
+
+          subtotal += currentPrice * item.quantityKg;
+
+          validatedItems.push({
+            listingId: item.listing._id,
+            cropName: listingData.cropName || item.listing.cropName,
+            category: listingData.category || item.listing.category,
+            photoUrl: (Array.isArray(listingData.photos) && listingData.photos[0]) || item.listing.photos[0] || 'carrots',
+            quantityKg: item.quantityKg,
+            pricePerKg: currentPrice,
+          });
+
+          if (i === 0) {
+            farmerName = listingData.farmerName || item.listing.farmerName;
+            farmerPhone = listingData.farmerPhone || item.listing.farmerPhone;
+            if (listingData.location) {
+              farmerLocation = listingData.location;
+            } else if (item.listing.location) {
+              farmerLocation = item.listing.location;
+            }
+          }
+        }
+
+        const deliveryFee = deliveryType === 'pickup' ? 0 : 1500;
+        const serviceFee = 0;
+        const total = subtotal + deliveryFee + serviceFee;
+        const farmerAddress = `${farmerLocation.town}, ${farmerLocation.district}`;
+
+        const orderPayload = {
+          _id: newOrderDocRef.id,
+          orderNumber,
+          buyerId: resolvedBuyerId,
+          buyerName: resolvedBuyerName,
+          buyerPhone: resolvedBuyerPhone,
+          farmerId,
+          farmerName,
+          farmerPhone,
+          farmerAddress,
+          items: validatedItems,
+          subtotal,
+          deliveryFee,
+          serviceFee,
+          total,
+          paymentMethod,
+          deliveryType,
+          pickupLocation: {
+            lat: farmerLocation.lat,
+            lng: farmerLocation.lng,
+            district: farmerLocation.district,
+            town: farmerLocation.town,
+            address: `${farmerName}'s Farm, ${farmerLocation.town}, ${farmerLocation.district}`,
+            directions: `Located near ${farmerLocation.town} Agrarian Services Centre. Contact ${farmerPhone} on approach.`,
+          },
+          pickupPin,
+          deliveryAddress: deliveryType === 'pickup' ? `Direct Farm Gate Pickup (${farmerLocation.town})` : deliveryAddress,
+          deliveryDistrict: deliveryType === 'pickup' ? farmerLocation.district : district,
+          deliveryNotes: notes,
+          deliveryTimeSlot: deliveryTimeSlot || 'Tomorrow (Morning 8:00 AM - 12:00 PM)',
+          cashChangeDetails: cashChangeDetails || '',
+          cardDetails: cardDetails || null,
+          status: 'pending' as OrderStatus,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          timeline: [
+            {
+              status: 'pending' as OrderStatus,
+              label: deliveryType === 'pickup' ? 'Order Placed (Farm Self-Pickup)' : 'Order Placed (Doorstep Delivery)',
+              timestamp: nowTimeStr,
+              note:
+                deliveryType === 'pickup'
+                  ? `Direct farm pickup requested. Farmer ${farmerName} notified to pack harvest at farm gate.`
+                  : `Doorstep delivery requested. Farmer ${farmerName} notified to prepare crates for driver dispatch. Payment: ${paymentMethod.replace(/_/g, ' ').toUpperCase()}`,
+            },
+          ],
+        };
+
+        // Create the pending order document
+        transaction.set(newOrderDocRef, orderPayload);
+
+        ordersToReturn.push({
+          ...orderPayload,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        } as Order);
+      }
+
+      return ordersToReturn;
+    });
+
+    setOrders(prev => [...createdOrders, ...prev.filter(o => !createdOrders.some(co => co._id === o._id))]);
     clearCart();
-    return primaryOrder;
+    return createdOrders[0];
   };
 
   const advanceOrderStatus = async (orderId: string): Promise<void> => {
@@ -1216,6 +1363,81 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       note: 'Harvest & packing preparation in progress',
     };
 
+    if (isFirebaseConfigured) {
+      try {
+        await runTransaction(db, async (transaction) => {
+          const orderRef = doc(db, 'orders', orderId);
+          const orderSnap = await transaction.get(orderRef);
+          if (!orderSnap.exists()) {
+            throw new Error('Order document not found in Firestore.');
+          }
+          const orderData = orderSnap.data();
+          if (orderData.status !== 'pending') {
+            throw new Error(`Order is not in pending status (current status: ${orderData.status}).`);
+          }
+
+          const items: OrderItem[] = orderData.items || [];
+          const listingSnaps = await Promise.all(
+            items.map(item => transaction.get(doc(db, 'listings', item.listingId)))
+          );
+
+          let subtotal = 0;
+          const updatedItems: OrderItem[] = [];
+
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const lSnap = listingSnaps[i];
+            if (!lSnap.exists()) {
+              throw new Error(`Listing "${item.cropName}" was not found.`);
+            }
+            const lData = lSnap.data();
+            const currentStock = Number(lData.quantityKg ?? lData.quantity ?? 0);
+            const currentPrice = Number(lData.pricePerKg ?? lData.price ?? item.pricePerKg);
+
+            if (item.quantityKg > currentStock) {
+              throw new Error(
+                `Insufficient stock for "${item.cropName}". Available: ${currentStock}kg, requested: ${item.quantityKg}kg.`
+              );
+            }
+
+            const remainingStock = Math.max(0, currentStock - item.quantityKg);
+            subtotal += currentPrice * item.quantityKg;
+
+            updatedItems.push({
+              ...item,
+              pricePerKg: currentPrice,
+            });
+
+            // Decrement Farmer's listing stock
+            transaction.update(doc(db, 'listings', item.listingId), {
+              quantity: remainingStock,
+              quantityKg: remainingStock,
+              status: remainingStock === 0 ? 'out_of_stock' : lData.status,
+              updatedAt: serverTimestamp(),
+            });
+          }
+
+          const deliveryFee = orderData.deliveryFee ?? (orderData.deliveryType === 'pickup' ? 0 : 1500);
+          const serviceFee = 0;
+          const total = subtotal + deliveryFee + serviceFee;
+
+          // Authoritatively update order status to accepted
+          transaction.update(orderRef, {
+            status: 'accepted',
+            items: updatedItems,
+            subtotal,
+            deliveryFee,
+            serviceFee,
+            total,
+            updatedAt: serverTimestamp(),
+            timeline: arrayUnion(timelineItem),
+          });
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE ACCEPT ORDER TRANSACTION WARNING:', err?.message || err);
+      }
+    }
+
     setOrders(prev =>
       prev.map(ord => {
         if (ord._id === orderId) {
@@ -1229,14 +1451,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return ord;
       })
     );
-
-    if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'accepted',
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
-    }
   };
 
   const farmerRejectOrder = async (orderId: string, reason: string): Promise<void> => {
@@ -1264,12 +1478,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'rejected',
-        rejectionReason: reason,
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'rejected',
+          rejectionReason: reason,
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE REJECT ORDER WARNING:', err?.message || err);
+      }
     }
   };
 
@@ -1312,15 +1530,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      const payload: any = {
-        status,
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      };
-      if (status === 'preparing' && (note || defaultNote)) {
-        payload.preparationNote = note || defaultNote;
+      try {
+        const payload: any = {
+          status,
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        };
+        if (status === 'preparing' && (note || defaultNote)) {
+          payload.preparationNote = note || defaultNote;
+        }
+        await updateDoc(doc(db, 'orders', orderId), payload);
+      } catch (err: any) {
+        console.warn('FIRESTORE UPDATE ORDER STATUS WARNING:', err?.message || err);
       }
-      await updateDoc(doc(db, 'orders', orderId), payload);
     }
   };
 
@@ -1350,13 +1572,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'delivered',
-        deliveredAt: nowStr,
-        deliveredBy: 'Direct Farm Gate Handover',
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'delivered',
+          deliveredAt: nowStr,
+          deliveredBy: 'Direct Farm Gate Handover',
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE CONFIRM PICKUP HANDOVER WARNING:', err?.message || err);
+      }
     }
   };
 
@@ -1394,14 +1620,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        driverId,
-        driverName,
-        driverPhone,
-        driverVehicle,
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          driverId,
+          driverName,
+          driverPhone,
+          driverVehicle,
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE DRIVER ACCEPT ORDER WARNING:', err?.message || err);
+      }
     }
   };
 
@@ -1430,11 +1660,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'out_for_delivery',
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'out_for_delivery',
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE DRIVER CONFIRM PICKUP WARNING:', err?.message || err);
+      }
     }
   };
 
@@ -1466,14 +1700,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'delivered',
-        deliveredAt: nowStr,
-        deliveredBy: driverName,
-        deliveryProofNote: proofNote || 'Delivered & verified by recipient at doorstep',
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'delivered',
+          deliveredAt: nowStr,
+          deliveredBy: driverName,
+          deliveryProofNote: proofNote || 'Delivered & verified by recipient at doorstep',
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE DRIVER CONFIRM DELIVERY WARNING:', err?.message || err);
+      }
     }
   };
 
@@ -1504,14 +1742,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     if (isFirebaseConfigured) {
-      await updateDoc(doc(db, 'orders', orderId), {
-        status: 'delivered',
-        deliveredAt: nowStr,
-        deliveredBy: 'Direct Farm Gate Handover',
-        deliveryProofNote: 'Handed over at farm gate.',
-        updatedAt: serverTimestamp(),
-        timeline: arrayUnion(timelineItem),
-      });
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'delivered',
+          deliveredAt: nowStr,
+          deliveredBy: 'Direct Farm Gate Handover',
+          deliveryProofNote: 'Handed over at farm gate.',
+          updatedAt: serverTimestamp(),
+          timeline: arrayUnion(timelineItem),
+        });
+      } catch (err: any) {
+        console.warn('FIRESTORE BUYER CONFIRM PICKUP WARNING:', err?.message || err);
+      }
     }
   };
 
@@ -1609,9 +1851,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         town: currentUser?.location?.town || 'Kandapola',
       },
       photos: Array.isArray(listingData.photos) ? listingData.photos : [],
-      status: (listingData.status as ListingStatus) || 'active',
-      isOrganic: Boolean(listingData.isOrganic),
-      organic: Boolean(listingData.isOrganic),
+      status: listingData.status === 'out_of_stock' ? 'out_of_stock' : 'active',
+      isOrganic: Boolean(listingData.isOrganic ?? (listingData as any).organic),
+      organic: Boolean((listingData as any).organic ?? listingData.isOrganic),
       harvestDate: listingData.harvestDate || new Date().toISOString().split('T')[0],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

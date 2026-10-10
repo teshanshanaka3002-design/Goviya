@@ -23,7 +23,7 @@ import {
   X,
   Navigation,
 } from 'lucide-react-native';
-import { useApp, db, doc, onSnapshot } from '../../services/store';
+import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { isValidPhotoUrl } from '../../services/imageService';
 import { Button } from '../../components/ui/Button';
@@ -56,12 +56,21 @@ export const FarmerOrdersScreen: React.FC = () => {
   // Firestore real-time onSnapshot listener for the tracking modal order
   useEffect(() => {
     if (!trackingOrder?._id) return;
-    const unsub = onSnapshot(doc(db, 'orders', trackingOrder._id), (docSnap) => {
-      const data = docSnap.data();
-      if (data) {
-        setTrackingOrder({ _id: docSnap.id, ...data } as Order);
+    if (!isFirebaseConfigured || !auth.currentUser || trackingOrder._id.startsWith('ord_')) {
+      return;
+    }
+    const unsub = onSnapshot(
+      doc(db, 'orders', trackingOrder._id),
+      (docSnap) => {
+        const data = docSnap.data();
+        if (data) {
+          setTrackingOrder({ _id: docSnap.id, ...data } as Order);
+        }
+      },
+      (error) => {
+        console.warn('FIRESTORE FARMER TRACKING ORDER WARNING:', error.message);
       }
-    });
+    );
     return () => unsub();
   }, [trackingOrder?._id]);
 

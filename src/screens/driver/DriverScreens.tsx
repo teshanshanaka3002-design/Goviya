@@ -38,7 +38,7 @@ import {
   FileText,
   Compass,
 } from 'lucide-react-native';
-import { useApp, db, doc, collection, onSnapshot } from '../../services/store';
+import { useApp, db, doc, collection, onSnapshot, auth, isFirebaseConfigured } from '../../services/store';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { StatusPill } from '../../components/ui/StatusPill';
@@ -96,12 +96,21 @@ export const DriverOrderDetailScreen: React.FC<DriverOrderDetailProps> = ({
   // Firestore real-time listener for this specific order
   useEffect(() => {
     if (!orderId) return;
-    const unsub = onSnapshot(doc(db, 'orders', orderId), (docSnap) => {
-      const data = docSnap.data();
-      if (data) {
-        setLiveOrder(data as Order);
+    if (!isFirebaseConfigured || !auth.currentUser || orderId.startsWith('ord_')) {
+      return;
+    }
+    const unsub = onSnapshot(
+      doc(db, 'orders', orderId),
+      (docSnap) => {
+        const data = docSnap.data();
+        if (data) {
+          setLiveOrder(data as Order);
+        }
+      },
+      (error) => {
+        console.warn('FIRESTORE DRIVER ORDER DETAIL WARNING:', error.message);
       }
-    });
+    );
     return () => unsub();
   }, [orderId]);
 

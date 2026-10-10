@@ -53,7 +53,7 @@ import {
   Percent,
   Compass,
 } from 'lucide-react-native';
-import { useApp, db, doc, onSnapshot } from '../../services/store';
+import { useApp, db, doc, onSnapshot, auth, isFirebaseConfigured } from '../../services/store';
 import { ProductCard } from '../../components/shared/ProductCard';
 import { SriLankaMap } from '../../components/shared/SriLankaMap';
 import { GoogleMapNearbyView } from '../../components/shared/GoogleMapNearbyView';
@@ -340,7 +340,7 @@ export const BuyerHomeScreen: React.FC = () => {
   const [selectedSectionFilter, setSelectedSectionFilter] = useState<'all' | 'offers' | 'discounted' | 'farmers'>('all');
 
   // Filter state matching UI design
-  const [filterCategories, setFilterCategories] = useState<string[]>(['Vegetables', 'Fruits']);
+  const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [minPrice, setMinPrice] = useState<number>(50);
   const [maxPrice, setMaxPrice] = useState<number>(1000);
   const [distanceKm, setDistanceKm] = useState<number>(25);
@@ -423,22 +423,22 @@ export const BuyerHomeScreen: React.FC = () => {
       let matchCategory = true;
       if (filterCategories.length > 0) {
         matchCategory = filterCategories.some(cat => {
-          if (cat === 'Vegetables') return l.category === 'Vegetables';
-          if (cat === 'Fruits') return l.category === 'Fruits';
+          if (cat === 'Vegetables') return l.category.toLowerCase() === 'vegetables';
+          if (cat === 'Fruits') return l.category.toLowerCase() === 'fruits';
           if (cat === 'Root Crops') {
-            return l.category === 'Tubers' || l.cropName.toLowerCase().includes('potato') || l.cropName.toLowerCase().includes('carrot');
+            return l.category.toLowerCase() === 'tubers' || l.cropName.toLowerCase().includes('potato') || l.cropName.toLowerCase().includes('carrot');
           }
           if (cat === 'Leafy Greens') {
-            return l.category === 'Vegetables' || l.cropName.toLowerCase().includes('leek') || l.cropName.toLowerCase().includes('cabbage') || l.cropName.toLowerCase().includes('mukunuwenna');
+            return l.category.toLowerCase() === 'vegetables' || l.cropName.toLowerCase().includes('leek') || l.cropName.toLowerCase().includes('cabbage') || l.cropName.toLowerCase().includes('mukunuwenna');
           }
           return l.category.toLowerCase().includes(cat.toLowerCase());
         });
       } else if (selectedCategory !== 'All') {
-        matchCategory = l.category === selectedCategory;
+        matchCategory = l.category.toLowerCase() === selectedCategory.toLowerCase();
       }
 
       const matchSearch = isMatchingSearch(l, searchQuery);
-      const matchPrice = l.pricePerKg >= minPrice && l.pricePerKg <= maxPrice;
+      const matchPrice = (minPrice <= 50 || l.pricePerKg >= minPrice) && (maxPrice >= 1000 || l.pricePerKg <= maxPrice);
       const matchDistrict = selectedDistrict === 'All' || l.location.district === selectedDistrict;
       const matchOrganic = !onlyOrganic || l.isOrganic;
       const matchAvailability = includeOutOfStock ? true : (showAvailableOnly ? l.status === 'active' && l.quantityKg > 0 : l.status === 'active');
@@ -459,13 +459,34 @@ export const BuyerHomeScreen: React.FC = () => {
     });
   }, [listings, filterCategories, selectedCategory, searchQuery, minPrice, maxPrice, selectedDistrict, onlyOrganic, showAvailableOnly, includeOutOfStock, minOrderFilter, filterSortBy, sortBy]);
 
+  console.log(
+    'BUYER RAW LISTINGS:',
+    listings.map(l => ({
+      id: l._id,
+      cropName: l.cropName,
+      status: l.status,
+      category: l.category,
+      quantity: l.quantity,
+      quantityKg: l.quantityKg,
+      createdAt: l.createdAt,
+    }))
+  );
+
+  console.log(
+    'BUYER FILTERED LISTINGS:',
+    filteredListings.map(l => ({
+      id: l._id,
+      cropName: l.cropName,
+    }))
+  );
+
   // Special Offer Listings
   const offerListings = useMemo(() => {
     return listings
       .filter(l => {
         const isOfferItem = Boolean(l.isOffer || (l.offerBadge && l.offerBadge.length > 0));
         const matchSearch = isMatchingSearch(l, searchQuery);
-        const matchCat = selectedCategory === 'All' || l.category === selectedCategory;
+        const matchCat = selectedCategory === 'All' || l.category.toLowerCase() === selectedCategory.toLowerCase();
         const matchDist = selectedDistrict === 'All' || l.location.district === selectedDistrict;
         const matchOrganic = !onlyOrganic || l.isOrganic;
         return isOfferItem && l.status === 'active' && matchSearch && matchCat && matchDist && matchOrganic;
@@ -482,7 +503,7 @@ export const BuyerHomeScreen: React.FC = () => {
           (l.originalPricePerKg && l.originalPricePerKg > l.pricePerKg)
         );
         const matchSearch = isMatchingSearch(l, searchQuery);
-        const matchCat = selectedCategory === 'All' || l.category === selectedCategory;
+        const matchCat = selectedCategory === 'All' || l.category.toLowerCase() === selectedCategory.toLowerCase();
         const matchDist = selectedDistrict === 'All' || l.location.district === selectedDistrict;
         const matchOrganic = !onlyOrganic || l.isOrganic;
         return isDiscounted && l.status === 'active' && matchSearch && matchCat && matchDist && matchOrganic;
@@ -491,7 +512,7 @@ export const BuyerHomeScreen: React.FC = () => {
   }, [listings, searchQuery, selectedCategory, selectedDistrict, onlyOrganic]);
 
   const activeFiltersCount =
-    (filterCategories.length > 0 && filterCategories.length < 4 ? 1 : 0) +
+    (filterCategories.length > 0 ? 1 : 0) +
     (minPrice > 50 || maxPrice < 1000 ? 1 : 0) +
     (distanceKm !== 25 ? 1 : 0) +
     (!showAvailableOnly || includeOutOfStock ? 1 : 0) +
@@ -501,7 +522,7 @@ export const BuyerHomeScreen: React.FC = () => {
 
   const resetAllFilters = () => {
     setSelectedCategory('All');
-    setFilterCategories(['Vegetables', 'Fruits']);
+    setFilterCategories([]);
     setMinPrice(50);
     setMaxPrice(1000);
     setDistanceKm(25);
@@ -2767,12 +2788,24 @@ export const BuyerOrderTrackingScreen: React.FC = () => {
   useEffect(() => {
     if (!initialActiveOrder?._id) return;
     setRealtimeOrder(initialActiveOrder);
-    const unsub = onSnapshot(doc(db, 'orders', initialActiveOrder._id), (docSnap) => {
-      const data = docSnap.data();
-      if (data) {
-        setRealtimeOrder({ _id: docSnap.id, ...data } as Order);
+
+    // Prevent querying Firestore for mock orders, guest visitors, or unconfigured Firebase
+    if (!isFirebaseConfigured || !auth.currentUser || initialActiveOrder._id.startsWith('ord_')) {
+      return;
+    }
+
+    const unsub = onSnapshot(
+      doc(db, 'orders', initialActiveOrder._id),
+      (docSnap) => {
+        const data = docSnap.data();
+        if (data) {
+          setRealtimeOrder({ _id: docSnap.id, ...data } as Order);
+        }
+      },
+      (error) => {
+        console.warn('FIRESTORE BUYER ORDER TRACKING WARNING:', error.message);
       }
-    });
+    );
     return () => unsub();
   }, [initialActiveOrder?._id]);
 

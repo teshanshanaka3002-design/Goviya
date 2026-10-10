@@ -7,6 +7,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function userDocExists() {
+      return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function currentUser() {
       return get(
         /databases/$(database)/documents/users/$(request.auth.uid)
@@ -14,18 +18,24 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && currentUser().role == 'admin';
+      return userDocExists() && currentUser().role == 'admin';
+    }
+
+    function isBuyer() {
+      return userDocExists()
+        && currentUser().role == 'buyer'
+        && currentUser().isDeactivated == false;
     }
 
     function isVerifiedFarmer() {
-      return signedIn()
+      return userDocExists()
         && currentUser().role == 'farmer'
         && currentUser().verified == true
         && currentUser().isDeactivated == false;
     }
 
     function isDriver() {
-      return signedIn()
+      return userDocExists()
         && currentUser().role == 'driver'
         && currentUser().isDeactivated == false;
     }
@@ -84,7 +94,7 @@ service cloud.firestore {
 
       // Farmer can edit/delete only their own listing.
       // Admin can manage any listing.
-      // Buyer and Driver must never be able to modify listing documents.
+      // Buyer and Driver have ZERO permission to modify listings.
       allow update: if isAdmin() ||
         (
           isVerifiedFarmer()
@@ -101,92 +111,212 @@ service cloud.firestore {
     match /orders/{orderId} {
 
       function isBuyerOrderUpdate() {
-        let isOwner = signedIn() && resource.data.buyerId == request.auth.uid;
+        let isOwner = isBuyer() && resource.data.buyerId == request.auth.uid;
+
         let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
           && request.resource.data.farmerId == resource.data.farmerId
           && request.resource.data.items == resource.data.items
           && request.resource.data.subtotal == resource.data.subtotal
           && request.resource.data.deliveryFee == resource.data.deliveryFee
+          && request.resource.data.serviceFee == resource.data.serviceFee
           && request.resource.data.total == resource.data.total
           && request.resource.data.paymentMethod == resource.data.paymentMethod
           && request.resource.data.deliveryType == resource.data.deliveryType
-          && (!('driverId' in resource.data) ? (!('driverId' in request.resource.data) || request.resource.data.driverId == null) : request.resource.data.driverId == resource.data.driverId);
+          && (!('driverId' in resource.data)
+              ? (!('driverId' in request.resource.data) || request.resource.data.driverId == null || request.resource.data.driverId == '')
+              : request.resource.data.driverId == resource.data.driverId);
 
-        let isCancel = resource.data.status == 'pending' && request.resource.data.status == 'cancelled';
+        // Buyer cancels pending order
+        let isCancel = resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'cancellationReason',
+            'updatedAt',
+            'timeline'
+          ]);
+
+        // Buyer confirms direct farm gate handover
         let isFarmPickupConfirm = resource.data.status == 'ready_for_pickup'
           && resource.data.deliveryType == 'pickup'
-          && request.resource.data.status == 'delivered';
+          && request.resource.data.status == 'delivered'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'deliveredAt',
+            'deliveredBy',
+            'deliveryProofNote',
+            'updatedAt',
+            'timeline'
+          ]);
 
         return isOwner && unchangedCore && (isCancel || isFarmPickupConfirm);
       }
 
       function isFarmerOrderUpdate() {
         let isOwnerFarmer = isVerifiedFarmer() && resource.data.farmerId == request.auth.uid;
+
+        // Core identifiers and method cannot be modified by farmer
         let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
           && request.resource.data.farmerId == resource.data.farmerId
-          && request.resource.data.items == resource.data.items
-          && request.resource.data.subtotal == resource.data.subtotal
-          && request.resource.data.deliveryFee == resource.data.deliveryFee
-          && request.resource.data.total == resource.data.total
-          && (!('driverId' in resource.data) ? (!('driverId' in request.resource.data) || request.resource.data.driverId == null) : request.resource.data.driverId == resource.data.driverId);
+          && request.resource.data.deliveryType == resource.data.deliveryType
+          && request.resource.data.paymentMethod == resource.data.paymentMethod
+          && (!('driverId' in resource.data)
+              ? (!('driverId' in request.resource.data) || request.resource.data.driverId == null || request.resource.data.driverId == '')
+              : request.resource.data.driverId == resource.data.driverId);
 
-        let validStatus = (resource.data.status == 'pending' && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected'))
-          || (resource.data.status == 'accepted' && request.resource.data.status == 'preparing')
-          || (resource.data.status == 'preparing' && request.resource.data.status == 'ready_for_pickup')
-          || (resource.data.status == 'ready_for_pickup' && resource.data.deliveryType == 'pickup' && request.resource.data.status == 'delivered');
+        // 1. Pending -> Accepted: Farmer runs runTransaction(), writes authoritative recalculated items & totals
+        let isAccept = resource.data.status == 'pending'
+          && request.resource.data.status == 'accepted'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'items',
+            'subtotal',
+            'deliveryFee',
+            'serviceFee',
+            'total',
+            'updatedAt',
+            'timeline'
+          ]);
 
-        return isOwnerFarmer && unchangedCore && validStatus;
+        // 2. Pending -> Rejected: Farmer declines order
+        let isReject = resource.data.status == 'pending'
+          && request.resource.data.status == 'rejected'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'rejectionReason',
+            'updatedAt',
+            'timeline'
+          ]);
+
+        // 3. Accepted -> Preparing: Farmer marks harvesting & crate packing
+        let isPreparing = resource.data.status == 'accepted'
+          && request.resource.data.status == 'preparing'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'preparationNote',
+            'updatedAt',
+            'timeline'
+          ]);
+
+        // 4. Preparing -> Ready for pickup: Ready at farm gate for dispatch / pickup
+        let isReadyForPickup = resource.data.status == 'preparing'
+          && request.resource.data.status == 'ready_for_pickup'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'preparationNote',
+            'updatedAt',
+            'timeline'
+          ]);
+
+        // 5. Farm Pickup Handover: Ready for pickup -> Delivered (pickup orders only)
+        let isFarmHandover = resource.data.status == 'ready_for_pickup'
+          && resource.data.deliveryType == 'pickup'
+          && request.resource.data.status == 'delivered'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'deliveredAt',
+            'deliveredBy',
+            'deliveryProofNote',
+            'updatedAt',
+            'timeline'
+          ]);
+
+        return isOwnerFarmer && unchangedCore && (
+          isAccept || isReject || isPreparing || isReadyForPickup || isFarmHandover
+        );
       }
 
       function isDriverOrderUpdate() {
         let isEligibleDriver = isDriver();
+
         let unchangedCore = request.resource.data.buyerId == resource.data.buyerId
           && request.resource.data.farmerId == resource.data.farmerId
           && request.resource.data.items == resource.data.items
           && request.resource.data.subtotal == resource.data.subtotal
           && request.resource.data.deliveryFee == resource.data.deliveryFee
+          && request.resource.data.serviceFee == resource.data.serviceFee
           && request.resource.data.total == resource.data.total
+          && request.resource.data.paymentMethod == resource.data.paymentMethod
           && request.resource.data.deliveryType == 'delivery';
 
-        // 1. Driver Accepts available delivery job
+        // 1. Driver Accepts available delivery job: assigns themselves without changing status
         let isAcceptingJob = resource.data.status == 'ready_for_pickup'
+          && request.resource.data.status == 'ready_for_pickup'
           && (!('driverId' in resource.data) || resource.data.driverId == null || resource.data.driverId == '')
           && request.resource.data.driverId == request.auth.uid
-          && request.resource.data.status == 'ready_for_pickup';
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'driverId',
+            'driverName',
+            'driverPhone',
+            'driverVehicle',
+            'updatedAt',
+            'timeline'
+          ]);
 
-        // 2. Assigned Driver progresses to out_for_delivery or delivered
-        let isAssignedDriver = resource.data.driverId == request.auth.uid
-          && request.resource.data.driverId == request.auth.uid;
+        // 2. Assigned Driver marks picked up: ready_for_pickup -> out_for_delivery
+        let isTransitPickup = resource.data.status == 'ready_for_pickup'
+          && request.resource.data.status == 'out_for_delivery'
+          && resource.data.driverId == request.auth.uid
+          && request.resource.data.driverId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'updatedAt',
+            'timeline'
+          ]);
 
-        let isValidTransitTransition = isAssignedDriver && (
-          (resource.data.status == 'ready_for_pickup' && request.resource.data.status == 'out_for_delivery') ||
-          (resource.data.status == 'out_for_delivery' && request.resource.data.status == 'delivered')
+        // 3. Assigned Driver marks delivered: out_for_delivery -> delivered
+        let isTransitDelivered = resource.data.status == 'out_for_delivery'
+          && request.resource.data.status == 'delivered'
+          && resource.data.driverId == request.auth.uid
+          && request.resource.data.driverId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'deliveredAt',
+            'deliveredBy',
+            'deliveryProofNote',
+            'updatedAt',
+            'timeline'
+          ]);
+
+        return isEligibleDriver && unchangedCore && (
+          isAcceptingJob || isTransitPickup || isTransitDelivered
         );
-
-        return isEligibleDriver && unchangedCore && (isAcceptingJob || isValidTransitTransition);
       }
 
-      // Buyer can read only their own orders.
-      // Farmer can read only orders for their listings.
-      // Driver can see eligible delivery jobs (ready_for_pickup) and assigned deliveries.
-      // Admin can read all orders.
-      allow read: if isAdmin() ||
-        (
-          signedIn() && (
-            resource.data.buyerId == request.auth.uid ||
-            resource.data.farmerId == request.auth.uid ||
+      // Role-specific order read access
+      allow read: if isAdmin()
+        || (
+          isBuyer()
+          && resource.data.buyerId == request.auth.uid
+        )
+        || (
+          isVerifiedFarmer()
+          && resource.data.farmerId == request.auth.uid
+        )
+        || (
+          isDriver()
+          && (
+            resource.data.driverId == request.auth.uid
+            ||
             (
-              isDriver() && (
-                resource.data.driverId == request.auth.uid ||
-                resource.data.status == 'ready_for_pickup'
-              )
+              resource.data.status == 'ready_for_pickup'
+              && resource.data.deliveryType == 'delivery'
             )
           )
         );
 
-      // Order creation is strictly managed by the trusted Cloud Function (Admin SDK) or Admin.
-      // Client-side users cannot directly create arbitrary orders.
-      allow create: if isAdmin();
+      // Only an active Buyer can create a pending order
+      allow create: if isAdmin()
+        || (
+          isBuyer()
+          && request.resource.data.buyerId == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && (
+            !('driverId' in request.resource.data)
+            || request.resource.data.driverId == null
+            || request.resource.data.driverId == ''
+          )
+        );
 
       // Explicitly hardened update permissions by role
       allow update: if isAdmin()
