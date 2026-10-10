@@ -162,6 +162,11 @@ export const openExternalGoogleMapsNavigation = (params: {
 
   Linking.openURL(url).catch((err) => {
     console.warn('Could not open external Google Maps navigation:', err);
-    Alert.alert('Map Error', 'Could not open Google Maps navigation on this device.');
   });
 };
+
+// Generic aliases for any role (driver, buyer, farmer)
+export const requestLocationPermission = requestDriverLocationPermission;
+export const getCurrentLocation = getDriverCurrentLocation;
+export const subscribeToLocation = subscribeToDriverLocation;
+export const subscribeToUserLocation = subscribeToDriverLocation;

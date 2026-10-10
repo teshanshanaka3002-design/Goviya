@@ -74,6 +74,7 @@ import { OrderLiveRouteMap } from '../../components/shared/OrderLiveRouteMap';
 import { Listing, Order, OrderStatus, SupportTicket, TicketMessage, TicketStatus } from '../../types';
 import { isValidPhotoUrl } from '../../services/imageService';
 import { useLanguage } from '../../i18n';
+import { resolveCoordinates } from '../../services/locationService';
 
 // ===================== OFFER CARD COMPONENT =====================
 const OfferCard: React.FC<{ listing: Listing }> = ({ listing }) => {
@@ -1294,6 +1295,7 @@ export const BuyerNearbyScreen: React.FC = () => {
   const mapMarkers = useMemo(() => {
     const list: {
       id: string;
+      farmerId?: string;
       name: string;
       crop?: string;
       district: string;
@@ -1301,20 +1303,33 @@ export const BuyerNearbyScreen: React.FC = () => {
       lat: number;
       lng: number;
       type?: 'farmer' | 'buyer' | 'driver';
+      phone?: string;
+      farmName?: string;
+      rating?: number;
     }[] = [];
 
     if (filterType === 'all' || filterType === 'farmers') {
       filteredFarmers.forEach(f => {
         if (f.location) {
+          const coord = resolveCoordinates(
+            f.location,
+            f.location.district || f.district,
+            f.location.town || f.location.address,
+            { lat: 6.9271, lng: 79.8612 }
+          );
           list.push({
             id: f._id,
+            farmerId: f._id,
             name: f.name,
             crop: f.farmName || 'Verified Farm',
-            district: f.location.district || '',
+            district: f.location.district || f.district || '',
             town: f.location.town || f.location.district || '',
-            lat: f.location.lat,
-            lng: f.location.lng,
+            lat: coord.lat,
+            lng: coord.lng,
             type: 'farmer',
+            phone: f.phone,
+            farmName: f.farmName,
+            rating: f.rating,
           });
         }
       });
@@ -1322,22 +1337,32 @@ export const BuyerNearbyScreen: React.FC = () => {
 
     if (filterType === 'all' || filterType === 'vegetables') {
       filteredVegetables.forEach(v => {
+        const coord = resolveCoordinates(
+          v.location,
+          v.location?.district,
+          v.location?.town,
+          { lat: 6.9271, lng: 79.8612 }
+        );
         const isDuplicate = list.some(
           m =>
-            Math.abs(m.lat - v.location.lat) < 0.001 &&
-            Math.abs(m.lng - v.location.lng) < 0.001 &&
+            Math.abs(m.lat - coord.lat) < 0.001 &&
+            Math.abs(m.lng - coord.lng) < 0.001 &&
             m.name === v.cropName
         );
         if (!isDuplicate) {
           list.push({
             id: v._id,
+            farmerId: v.farmerId,
             name: v.cropName,
-            crop: v.cropName,
+            crop: `${v.cropName} (${v.quantityKg} kg)`,
             district: v.location.district,
             town: v.location.town,
-            lat: v.location.lat,
-            lng: v.location.lng,
+            lat: coord.lat,
+            lng: coord.lng,
             type: 'farmer',
+            phone: v.farmerPhone,
+            farmName: v.farmerName,
+            rating: v.farmerRating,
           });
         }
       });
@@ -1604,6 +1629,7 @@ export const BuyerNearbyScreen: React.FC = () => {
               onSelectMarker={id => setSelectedMapMarkerId(id)}
               searchQuery={searchLocation}
               onOpenChat={(id, name) => handleChat(id, name)}
+              onViewSeller={farmerId => setSelectedFarmerModalId(farmerId)}
             />
           ) : (
             <SriLankaMap
